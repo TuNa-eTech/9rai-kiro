@@ -1,0 +1,40 @@
+[package]
+name = "nine-rai-desktop"
+version = "0.1.0"
+description = "9rai desktop GUI: configure the engine and supervise the privileged daemon"
+authors = ["anhtu"]
+license = "MIT"
+repository = "https://github.com/anhtu/9rai-client"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[features]
+# Production builds: embed `frontendDist` and serve it from the app protocol instead of
+# expecting the dev server. The Tauri CLI turns this on for `tauri build` when it exists;
+# `cargo run` without it is dev mode and needs `npm run dev` running.
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+nine-rai-core.workspace = true
+# The GUI only speaks plain-HTTP loopback to the control channel; `json` is for parsing it.
+reqwest.workspace = true
+tokio.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+log = "0.4"
+# Wall-clock stamps for the lines the supervisor writes into the shared daemon log.
+time.workspace = true
+
+tauri = { version = "2.6.3", features = [] }
+tauri-plugin-log = "2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

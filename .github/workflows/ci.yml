@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    name: core (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy -p nine-rai-core -p nine-rai-cli --all-targets -- -D warnings
+      - name: test
+        run: cargo test -p nine-rai-core -p nine-rai-cli --locked
+
+  dependency-tree:
+    name: single crypto backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.98.0"
+      - name: No aws-lc-rs, no duplicate rustls
+        run: |
+          ! cargo tree | grep -q aws-lc-rs
+          test "$(cargo tree -d | grep -c '^rustls v' || true)" -le 1

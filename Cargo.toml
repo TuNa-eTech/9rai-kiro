@@ -1,0 +1,67 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli", "apps/desktop/src-tauri"]
+# The desktop app drags in the whole Tauri toolchain; keeping it out of the default set means
+# `cargo test` / `cargo build` at the root stay fast and never block on the GUI stack.
+# Reach it explicitly with `-p nine-rai-desktop`, or cover everything with `--workspace`.
+default-members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/anhtu/9rai-client"
+
+[workspace.dependencies]
+# Cargo forbids a package name starting with a digit, so the crates are `nine-rai-*`.
+# The shipped binary is still called `9rai`.
+nine-rai-core = { path = "crates/core" }
+
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "signal", "process", "fs", "sync", "time"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+rustls-pki-types = "1"
+webpki-roots = "1"
+# `ring` backend, not the default aws-lc-rs: aws-lc-rs needs cmake + NASM on
+# x86_64-pc-windows-msvc, and a second crypto backend would link alongside rustls's.
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem", "x509-parser"] }
+
+hyper = { version = "1", features = ["server", "client", "http1", "http2"] }
+# No `client-legacy`: its pool cannot take a pre-built TLS stream with a custom IP+SNI pair,
+# which is exactly what passthrough needs. We drive hyper's conn handshakes directly.
+hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "http2"] }
+http-body-util = "0.1"
+bytes = "1"
+
+# `rustls-no-provider` + a ring provider installed at startup keeps a single crypto backend in
+# the tree; reqwest's plain `rustls` feature would pull aws-lc-rs alongside rustls's ring.
+# Note: `rustls-no-provider` enables reqwest's `__rustls`, which pulls in
+# rustls-platform-verifier — provider connections are therefore verified against the OS trust
+# store (deliberate: corporate CAs on internal endpoints keep working). The bundled webpki
+# roots are used explicitly for the passthrough path in `proxy::passthrough`, not by reqwest.
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "http2", "rustls-no-provider"] }
+hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+crc32fast = "1.4"
+dashmap = "6"
+dirs = "5"
+futures-util = "0.3"
+time = "0.3"
+sha1 = "0.10"
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+# Deliberately NOT panic = "abort": a panic in one connection task must not kill the proxy
+# and strand the user with a hijacked hosts file and nothing listening on :443.

@@ -1,0 +1,21 @@
+{
+  "name": "9rai-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "dev:app": "bash scripts/stage-cli.sh debug && vite",
+    "build:app": "bash scripts/stage-cli.sh release && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "vite": "^8"
+  }
+}

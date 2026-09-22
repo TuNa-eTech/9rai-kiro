@@ -1,0 +1,7 @@
+data: {"model":"gpt-4o","choices":[{"delta":{"content":"Here <think>need to"}}]}
+data: {"choices":[{"delta":{"content":" list</think>are the files."}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"list_files","arguments":"{\"path\""}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":":\".\"}"}}]}}]}
+data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}
+data: {"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":8}}
+data: [DONE]

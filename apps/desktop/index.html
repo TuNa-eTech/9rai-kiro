@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>9rai</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="bolt">⚡</span>
+        <h1>9rai</h1>
+        <span class="tagline">Kiro IDE → any OpenAI-compatible provider</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-view="home">Home</button>
+        <button class="tab" data-view="settings">Settings</button>
+      </nav>
+      <div id="proxy-pill" class="pill" data-state="stopped">stopped</div>
+    </header>
+
+    <div id="banner" class="banner hidden" role="alert"></div>
+
+    <main>
+      <!-- ── Home: quick on/off + readiness ─────────────────────────── -->
+      <section class="card" id="view-home">
+        <div class="hero-head">
+          <div>
+            <h2 id="hero-state" data-state="stopped">Proxy is off</h2>
+            <p class="hint" id="daemon-detail"></p>
+          </div>
+          <label class="switch" title="Start or stop the 9rai proxy">
+            <input type="checkbox" id="proxy-toggle" aria-label="Start or stop the 9rai proxy" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="kv"><span>Daemon PID</span><code id="daemon-pid">—</code></div>
+        <div class="kv"><span>Control port</span><code id="daemon-port">—</code></div>
+
+        <h3 class="check-title">Readiness</h3>
+        <ul class="checklist" id="checklist"></ul>
+
+        <details class="log-wrap" open>
+          <summary>Recent daemon output</summary>
+          <pre id="home-log">—</pre>
+        </details>
+      </section>
+
+      <!-- ── Settings: the engine's configuration ───────────────────── -->
+      <div id="view-settings" class="hidden">
+        <section class="card">
+          <div class="card-head">
+            <h2>Provider</h2>
+            <p class="sub">
+              Where intercepted Kiro chat turns are sent. The key is stored with <code>0600</code>
+              and is never sent back to this window.
+            </p>
+          </div>
+          <div class="field">
+            <label for="base-url">Base URL</label>
+            <input id="base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" />
+          </div>
+          <div class="field">
+            <label for="api-key">API key</label>
+            <input id="api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…" />
+            <p class="hint" id="api-key-hint">No key stored yet.</p>
+          </div>
+          <div class="actions">
+            <button id="save-provider" class="btn primary">Save provider</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Model mappings</h2>
+            <p class="sub">
+              Kiro model id → provider model. <code>auto</code> is the agent's main turn and
+              <code>simple-task</code> its background sub-tasks — leave a slot empty to pass it
+              through to AWS untouched.
+            </p>
+          </div>
+          <div class="slot-rows" id="slot-rows"></div>
+          <div class="row add-row">
+            <input id="custom-kiro" placeholder="custom Kiro model id…" spellcheck="false" />
+            <span class="arrow">→</span>
+            <input id="custom-provider" placeholder="provider model" spellcheck="false" />
+          </div>
+          <div class="actions">
+            <button id="apply-mappings" class="btn primary">Apply mappings</button>
+          </div>
+          <div class="row default-row">
+            <label for="default-model">Fallback for unmapped models</label>
+            <input id="default-model" placeholder="(none — pass through)" spellcheck="false" />
+            <button id="save-default" class="btn">Save</button>
+            <button id="clear-default" class="btn ghost">Clear</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Root certificate</h2>
+            <p class="sub">
+              One click mints the CA and installs it into the system trust store (one
+              administrator prompt). Starting the proxy does the same automatically.
+            </p>
+          </div>
+          <div class="kv"><span>Fingerprint</span><code id="ca-fingerprint">—</code></div>
+          <div class="kv"><span>Trusted</span><span id="ca-trusted" class="badge" data-state="unknown">—</span></div>
+          <div class="actions">
+            <button id="ca-setup" class="btn primary">Auto setup</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Daemon log</h2>
+            <p class="sub">The daemon's own output, captured by the launcher.</p>
+          </div>
+          <pre id="daemon-log">—</pre>
+        </section>
+      </div>
+    </main>
+
+    <footer><code id="config-path"></code></footer>
+    <div id="toasts"></div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

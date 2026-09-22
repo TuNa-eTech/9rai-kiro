@@ -1,0 +1,18 @@
+/target
+**/target
+Cargo.lock.bak
+
+# Local MITM state — CA private key MUST never be committed
+/data
+*.key
+*.pem
+*.crt
+*.p12
+
+# Tauri
+apps/desktop/gen
+apps/desktop/dist
+apps/desktop/node_modules
+
+# Sidecar copies of the CLI, staged by apps/desktop/scripts/stage-cli.sh
+apps/desktop/src-tauri/binaries
