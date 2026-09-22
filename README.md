@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue.svg)](#platform-support)
 [![Build & Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#development--testing)
 
-[Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [CLI Reference](#-cli-reference) • [Architecture](#-architecture) • [Desktop GUI](#-desktop-gui) • [Security](#-security--privacy)
+[Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [CLI Reference](#-cli-reference) • [Architecture](#-architecture) • [Screenshots](#screenshots) • [Security](#-security--privacy)
 
 </div>
 
