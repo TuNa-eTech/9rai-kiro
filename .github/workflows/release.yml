@@ -111,7 +111,8 @@ jobs:
       - name: Build
         run: cargo build -p nine-rai-cli --release --locked --target ${{ matrix.triple }}
       # One bash step for all three OSes: the runner images ship bash (Git Bash on Windows) and
-      # the archiving tools used below.
+      # the archiving tools used below. Every path is relative so nothing depends on how MSYS
+      # translates arguments on the Windows runner.
       - name: Package
         shell: bash
         env:
@@ -124,17 +125,22 @@ jobs:
           case "$TRIPLE" in *windows*) exe=".exe" ;; esac
 
           name="9rai-$VERSION-$TRIPLE"
-          stage="$(mktemp -d)/$name"
-          mkdir -p "$stage" dist
-          cp "target/$TRIPLE/release/9rai$exe" "$stage/"
-          cp README.md LICENSE "$stage/"
+          stage_root=".release-stage"
+          rm -rf "$stage_root" dist
+          mkdir -p "$stage_root/$name" dist
+          cp "target/$TRIPLE/release/9rai$exe" "$stage_root/$name/"
+          cp README.md LICENSE "$stage_root/$name/"
 
+          # `cd` into the stage root so the archive holds a bare `$name/` prefix rather than the
+          # absolute path cargo was built into.
           if [ -n "$exe" ]; then
-            # Relative output path: no MSYS path translation to trip over on Windows.
-            (cd "$(dirname "$stage")" && 7z a -tzip -bso0 -bsp0 "$GITHUB_WORKSPACE/dist/$name.zip" "$name")
+            (cd "$stage_root" && 7z a -tzip -bso0 -bsp0 "../dist/$name.zip" "$name")
           else
-            tar -czf "dist/$name.tar.gz" -C "$(dirname "$stage")" "$name"
+            (cd "$stage_root" && tar -czf "../dist/$name.tar.gz" "$name")
           fi
+
+          rm -rf "$stage_root"
+          ls -l dist
       - uses: actions/upload-artifact@v7
         with:
           name: cli-${{ matrix.triple }}
