@@ -10,7 +10,7 @@ default-members = ["crates/core", "crates/cli"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/anhtu/9rai-client"
+repository = "https://github.com/TuNa-eTech/9rai-kiro"
 
 [workspace.dependencies]
 # Cargo forbids a package name starting with a digit, so the crates are `nine-rai-*`.

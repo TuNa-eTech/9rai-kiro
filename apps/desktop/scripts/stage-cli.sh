@@ -17,14 +17,20 @@ if [ -z "$triple" ]; then
   exit 1
 fi
 
+# Windows builds both produce and expect `9rai.exe`: tauri-utils::resources::external_binaries
+# appends `.exe` to `binaries/9rai-<triple>` on Windows targets, and a missing suffix is a hard
+# bundle error rather than a rename.
+exe=""
+case "$triple" in *windows*) exe=".exe" ;; esac
+
 case "$profile" in
   debug)
     cargo build --manifest-path "$root/Cargo.toml" --bin 9rai
-    built="$root/target/debug/9rai"
+    built="$root/target/debug/9rai$exe"
     ;;
   release)
     cargo build --manifest-path "$root/Cargo.toml" --bin 9rai --release
-    built="$root/target/release/9rai"
+    built="$root/target/release/9rai$exe"
     ;;
   *)
     echo "usage: stage-cli.sh [debug|release]" >&2
@@ -32,9 +38,10 @@ case "$profile" in
     ;;
 esac
 
-# Tauri resolves an externalBin by appending the host triple; bundling strips it again so the
-# binary lands beside the GUI as plain `9rai` — exactly the name locate_cli looks for.
+# Tauri resolves an externalBin by appending the host triple; bundling strips the triple again so
+# the binary lands beside the GUI as `9rai` (`9rai.exe` on Windows) — exactly the name locate_cli
+# looks for.
 dest="$root/apps/desktop/src-tauri/binaries"
 mkdir -p "$dest"
-cp -f "$built" "$dest/9rai-$triple"
-echo "stage-cli: staged $profile 9rai -> src-tauri/binaries/9rai-$triple"
+cp -f "$built" "$dest/9rai-$triple$exe"
+echo "stage-cli: staged $profile 9rai -> src-tauri/binaries/9rai-$triple$exe"

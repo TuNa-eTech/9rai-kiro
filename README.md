@@ -85,8 +85,8 @@ No binary patching, no disassembling, and no IDE hacks required. 9rai operates t
 Clone the repository and build the CLI executable:
 
 ```bash
-git clone https://github.com/anhtu/9rai-client.git
-cd 9rai-client
+git clone https://github.com/TuNa-eTech/9rai-kiro.git
+cd 9rai-kiro
 
 cargo build --release --bin 9rai
 ```
@@ -205,7 +205,7 @@ cargo run --bin 9rai -- verify --input fixtures/out.bin
 ## 🏗️ Architecture
 
 ```
-9rai-client/
+9rai-kiro/
 ├── apps/
 │   └── desktop/          # Tauri control panel: config, CA, daemon lifecycle + logs
 ├── crates/

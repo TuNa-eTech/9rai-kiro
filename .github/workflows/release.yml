@@ -1,0 +1,221 @@
+name: release
+
+# Tag-driven: push a `v0.1.0` (or `0.1.0`) tag and every platform builds in parallel; one final
+# job publishes the CLI binaries and the desktop bundles to a single GitHub Release.
+#
+# Re-running a failed release: `gh workflow run release.yml -f tag=v0.1.0`. The publish step
+# updates the existing release instead of failing on the duplicate tag — but it also regenerates
+# the release notes, so hand-written notes on an existing release are lost.
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and publish (must already exist)
+        required: true
+        type: string
+
+# Read-only by default; only the publish job is allowed to write.
+permissions:
+  contents: read
+
+# A second tag push must not race the first one's asset uploads.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: "1.98.0"
+
+jobs:
+  # Fails the whole release before anything is built if the tag and the manifests disagree —
+  # otherwise the artifacts would be labelled with a version they do not contain.
+  guard:
+    name: version guard
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Tag must match Cargo.toml and tauri.conf.json
+        id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::tag '$TAG' is not vX.Y.Z or X.Y.Z[-suffix]"
+            exit 1
+          fi
+
+          cargo_version="$(awk '/^\[workspace\.package\]/{w=1;next} /^\[/{w=0} w&&/^version *=/{gsub(/[",]/,"",$3);print $3;exit}' Cargo.toml)"
+          app_version="$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)"
+          if [ "$cargo_version" != "$version" ] || [ "$app_version" != "$version" ]; then
+            echo "::error::version mismatch — tag=$version Cargo.toml=$cargo_version tauri.conf.json=$app_version"
+            echo "Bump [workspace.package] version and the desktop version, commit, then re-tag."
+            exit 1
+          fi
+
+          prerelease=false
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+  # The shipped `9rai` binary. Same platform matrix the README advertises; the two macOS and the
+  # two Linux entries exist so Intel Macs and ARM Linux boxes get a native build.
+  cli:
+    name: cli (${{ matrix.triple }})
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            triple: aarch64-apple-darwin
+          - os: macos-15
+            triple: x86_64-apple-darwin
+          - os: windows-2022
+            triple: x86_64-pc-windows-msvc
+          - os: ubuntu-22.04
+            triple: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            triple: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.triple }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.triple }}
+      - name: Build
+        run: cargo build -p nine-rai-cli --release --locked --target ${{ matrix.triple }}
+      # One bash step for all three OSes: the runner images ship bash (Git Bash on Windows) and
+      # the archiving tools used below.
+      - name: Package
+        shell: bash
+        env:
+          TRIPLE: ${{ matrix.triple }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          exe=""
+          case "$TRIPLE" in *windows*) exe=".exe" ;; esac
+
+          name="9rai-$VERSION-$TRIPLE"
+          stage="$(mktemp -d)/$name"
+          mkdir -p "$stage" dist
+          cp "target/$TRIPLE/release/9rai$exe" "$stage/"
+          cp README.md LICENSE "$stage/"
+
+          if [ -n "$exe" ]; then
+            # Relative output path: no MSYS path translation to trip over on Windows.
+            (cd "$(dirname "$stage")" && 7z a -tzip -bso0 -bsp0 "$GITHUB_WORKSPACE/dist/$name.zip" "$name")
+          else
+            tar -czf "dist/$name.tar.gz" -C "$(dirname "$stage")" "$name"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.triple }}
+          path: dist/*
+          retention-days: 7
+          if-no-files-found: error
+
+  # The Tauri bundles. macOS ships the Apple Silicon build only — the GUI is a convenience
+  # control panel over the same engine, and the Intel half would need a second macOS runner.
+  # Linux bundles are left out on purpose: they need webkit2gtk plus AppImage tooling, and the
+  # README already marks Linux trust-store setup as manual.
+  desktop:
+    name: desktop (${{ matrix.label }})
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            label: macos-aarch64
+            bundles: target/release/bundle/dmg/*.dmg
+          - os: windows-2022
+            label: windows-x64
+            bundles: |
+              target/release/bundle/msi/*.msi
+              target/release/bundle/nsis/*-setup.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: desktop-${{ matrix.label }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install frontend deps
+        working-directory: apps/desktop
+        run: npm ci
+      # `beforeBuildCommand` (npm run build:app) stages the release CLI as the sidecar and builds
+      # the frontend, so the GUI and the engine always ship from the same commit.
+      - name: Build bundles
+        working-directory: apps/desktop
+        run: npm run tauri build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.label }}
+          path: ${{ matrix.bundles }}
+          retention-days: 7
+          if-no-files-found: error
+
+  # Publishing is a separate job so a half-built matrix can never produce a release: every build
+  # job has to succeed before this one starts.
+  publish:
+    name: publish
+    needs: [guard, cli, desktop]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.guard.outputs.tag }}
+          name: ${{ needs.guard.outputs.tag }}
+          prerelease: ${{ needs.guard.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/*

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "9rai desktop GUI: configure the engine and supervise the privileged daemon"
 authors = ["anhtu"]
 license = "MIT"
-repository = "https://github.com/anhtu/9rai-client"
+repository = "https://github.com/TuNa-eTech/9rai-kiro"
 edition = "2021"
 rust-version = "1.77.2"
 
