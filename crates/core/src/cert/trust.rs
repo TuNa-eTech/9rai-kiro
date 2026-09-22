@@ -119,7 +119,7 @@ fn launchctl<const N: usize>(args: [&str; N]) -> Vec<Argv> {
     {
         // `launchctl` is macOS-only; elsewhere the variable is the user's own business.
         let _ = args;
-        return Vec::new();
+        Vec::new()
     }
     #[cfg(target_os = "macos")]
     {
@@ -205,32 +205,27 @@ pub fn unix_is_installed(expected_fingerprint: &str) -> bool {
 }
 
 /// Does the system actually evaluate our root as a trusted SSL anchor?
-#[cfg(not(windows))]
+///
+/// macOS only — it is the one platform that splits "imported" from "trusted"; elsewhere
+/// presence is the answer, and `unix_cert_is_present` already covers that.
+#[cfg(target_os = "macos")]
 fn unix_trust_is_effective() -> bool {
-    #[cfg(not(target_os = "macos"))]
-    {
-        // Only macOS splits "imported" from "trusted"; elsewhere presence is the answer.
-        true
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let Ok(cert) = crate::paths::root_ca_cert() else {
-            return false;
-        };
-        Command::new("security")
-            .args([
-                "verify-cert",
-                "-c",
-                &cert.to_string_lossy(),
-                "-p",
-                "ssl",
-                "-k",
-                MAC_KEYCHAIN,
-            ])
-            .output()
-            .map(|out| out.status.success())
-            .unwrap_or(false)
-    }
+    let Ok(cert) = crate::paths::root_ca_cert() else {
+        return false;
+    };
+    Command::new("security")
+        .args([
+            "verify-cert",
+            "-c",
+            &cert.to_string_lossy(),
+            "-p",
+            "ssl",
+            "-k",
+            MAC_KEYCHAIN,
+        ])
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
 }
 
 /// The certificate bytes we expect, sitting in the system keychain.

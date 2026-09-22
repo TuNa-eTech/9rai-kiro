@@ -8,7 +8,6 @@
 //! unreadable back. So when euid is 0 we resolve the invoking user (sudo env, doas env, or the
 //! console owner for osascript elevation) and use *their* data dir, chowning everything back.
 
-use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
 use crate::{Error, Result};
@@ -65,6 +64,7 @@ pub fn ensure_dir(path: &Path) -> Result<()> {
 pub fn write_private(path: &Path, contents: &[u8]) -> Result<()> {
     #[cfg(unix)]
     {
+        use std::io::Write as _;
         use std::os::unix::fs::OpenOptionsExt;
         let mut file = std::fs::OpenOptions::new()
             .write(true)
