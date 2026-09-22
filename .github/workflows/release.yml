@@ -152,6 +152,13 @@ jobs:
   # control panel over the same engine, and the Intel half would need a second macOS runner.
   # Linux bundles are left out on purpose: they need webkit2gtk plus AppImage tooling, and the
   # README already marks Linux trust-store setup as manual.
+  #
+  # Windows is NSIS only. The MSI (WiX) target dies inside `candle.exe` on the runner — tauri
+  # reports only "failed to run ...candle.exe", with no compiler output to diagnose it from, and
+  # it additionally depends on downloading a WiX zip at build time. `--bundles nsis` produces
+  # Tauri's own installer with the NSIS that is already on the image; re-add `msi` here (and the
+  # msi glob below) once someone can reproduce the candle failure on a real Windows box with
+  # `tauri build --verbose`.
   desktop:
     name: desktop (${{ matrix.label }})
     needs: guard
@@ -161,12 +168,12 @@ jobs:
         include:
           - os: macos-15
             label: macos-aarch64
-            bundles: target/release/bundle/dmg/*.dmg
+            kinds: dmg
+            artifacts: target/release/bundle/dmg/*.dmg
           - os: windows-2022
             label: windows-x64
-            bundles: |
-              target/release/bundle/msi/*.msi
-              target/release/bundle/nsis/*-setup.exe
+            kinds: nsis
+            artifacts: target/release/bundle/nsis/*-setup.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -190,11 +197,11 @@ jobs:
       # the frontend, so the GUI and the engine always ship from the same commit.
       - name: Build bundles
         working-directory: apps/desktop
-        run: npm run tauri build
+        run: npm run tauri build -- --bundles ${{ matrix.kinds }}
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.label }}
-          path: ${{ matrix.bundles }}
+          path: ${{ matrix.artifacts }}
           retention-days: 7
           if-no-files-found: error
 
