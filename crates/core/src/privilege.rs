@@ -314,12 +314,17 @@ mod tests {
     fn reloading_the_resolver_is_a_tolerated_restart() {
         let cmds = render(&[PrivOp::ReloadResolver]);
         assert_eq!(cmds.len(), 1);
-        assert!(
-            cmds[0].1,
-            "a resolver that is not running is not a reason to fail the batch"
-        );
+        // Tolerance is a macOS property: `killall` exits non-zero when the daemon is not
+        // running, and that must not fail the batch. Linux's `resolvectl flush-caches` and
+        // Windows' `ipconfig /flushdns` are hard requirements, exactly like `FlushDns` itself.
         #[cfg(target_os = "macos")]
-        assert_eq!(cmds[0].0, ["killall", "mDNSResponder"]);
+        {
+            assert!(
+                cmds[0].1,
+                "a resolver that is not running is not a reason to fail the batch"
+            );
+            assert_eq!(cmds[0].0, ["killall", "mDNSResponder"]);
+        }
         // It carries no paths or names, so it is always safe to run elevated.
         validate(&[PrivOp::ReloadResolver]).expect("the reload op needs no validation");
     }
