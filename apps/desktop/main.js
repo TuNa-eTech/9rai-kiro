@@ -106,7 +106,9 @@ function renderConfig(view) {
   const fallback = $("default-model");
   if (document.activeElement !== fallback) fallback.value = view.default_model ?? "";
 
-  $("config-path").textContent = view.config_path ? `config: ${view.config_path}` : "";
+  // The footer names the config file, not its absolute path — the path is long and unhelpful here.
+  const configFile = view.config_path?.split(/[/\\]/).pop();
+  $("config-path").textContent = configFile ? `config: ${configFile}` : "";
 
   renderChecklist();
   renderDaemon(daemon);

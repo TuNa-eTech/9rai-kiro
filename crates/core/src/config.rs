@@ -53,7 +53,10 @@ impl fmt::Display for Tool {
 /// passed through to AWS untouched, which silently defeats interception.
 pub const KIRO_MODEL_SLOTS: &[(&str, &str)] = &[
     ("auto", "Auto (Kiro Agent)"),
+    ("claude-opus-5", "Claude Opus 5"),
+    ("claude-opus-4.8", "Claude Opus 4.8"),
     ("claude-sonnet-5", "Claude Sonnet 5"),
+    ("claude-sonnet-4.6", "Claude Sonnet 4.6"),
     ("claude-sonnet-4.5", "Claude Sonnet 4.5"),
     ("claude-sonnet-4", "Claude Sonnet 4"),
     ("claude-haiku-4.5", "Claude Haiku 4.5"),
