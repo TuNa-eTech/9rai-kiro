@@ -334,6 +334,31 @@ Check code style and linting:
 cargo clippy --workspace --all-targets
 ```
 
+### Cutting a release
+
+Push a tag matching the version in `Cargo.toml` and `apps/desktop/src-tauri/tauri.conf.json`:
+
+```bash
+git tag -a v0.1.0 -m "9rai v0.1.0"
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` then builds the CLI for macOS (arm64 and x86_64), Windows
+(x86_64) and Linux (x86_64 and aarch64), bundles the desktop app as a `.dmg` (Apple Silicon)
+and a NSIS `-setup.exe`, and publishes all of it with a `SHA256SUMS` file to a GitHub Release.
+A version guard fails the run before anything is built if the tag and the manifests disagree,
+and nothing is published unless every platform builds.
+
+Re-running a failed release (the release is then updated in place):
+
+```bash
+gh workflow run release.yml -f tag=v0.1.0
+```
+
+> The Windows installer is NSIS only for now; the MSI target fails inside WiX's `candle.exe`
+> on GitHub's runners. Add `msi` back to the `kinds` matrix in `release.yml` once that is
+> reproducible locally with `tauri build --verbose`.
+
 ---
 
 ## 🗺️ Roadmap
