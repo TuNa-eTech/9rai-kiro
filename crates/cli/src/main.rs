@@ -350,10 +350,7 @@ fn run_daemon(control_port: Option<u16>, token: Option<String>) -> Result<()> {
         return Err(e);
     }
 
-    tracing::info!(
-        fingerprint = store.fingerprint(),
-        "interception enabled"
-    );
+    tracing::info!(fingerprint = store.fingerprint(), "interception enabled");
     eprintln!(
         "interception enabled; CA fingerprint {}",
         store.fingerprint()
@@ -452,8 +449,8 @@ fn ensure_ca_trusted(
     tracing::warn!(
         remedy = %trust::manual_trust_command(&cert.to_string_lossy()),
         "the system trust store does not trust our root — Node clients still work through \
-NODE_EXTRA_CA_CERTS, but anything using the OS trust store (Chromium, and with it an IDE's \
-non-Node requests) will reject our certificates until the remedy is run in a terminal"
+    NODE_EXTRA_CA_CERTS, but anything using the OS trust store (Chromium, and with it an IDE's \
+    non-Node requests) will reject our certificates until the remedy is run in a terminal"
     );
 }
 

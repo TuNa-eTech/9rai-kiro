@@ -166,7 +166,10 @@ reject our certificate for the rest of its life"
     #[test]
     fn enabling_never_risks_the_startup_on_a_trust_store_write() {
         let ops = enable_ops_for("/ca/rootCA.crt".into(), "/staged/hosts".into());
-        assert_eq!(kinds(&ops), ["set-node-ca-env", "install-hosts", "flush-dns"]);
+        assert_eq!(
+            kinds(&ops),
+            ["set-node-ca-env", "install-hosts", "flush-dns"]
+        );
         assert!(
             !kinds(&ops).contains(&"install-ca"),
             "a refused trust-settings write would abort a startup that is otherwise fine"

@@ -203,8 +203,8 @@ fn log_connection_error(peer: std::net::SocketAddr, e: &Error) {
             %peer,
             error = %text,
             "the client rejected our certificate — it reached none of our trust paths. Check \
-`9rai ca status` for the system store; a process started before the proxy was enabled has \
-neither that nor NODE_EXTRA_CA_CERTS and needs restarting"
+        `9rai ca status` for the system store; a process started before the proxy was enabled has \
+        neither that nor NODE_EXTRA_CA_CERTS and needs restarting"
         );
     } else if lower.contains("eof") {
         tracing::debug!(

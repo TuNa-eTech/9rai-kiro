@@ -217,7 +217,10 @@ pub async fn install_ca() -> Result<CaStatus, String> {
         return Err(format!(
             "macOS still does not trust the root CA. Run this in a terminal, then try again:\n{}",
             trust::manual_trust_command(
-                &store.root_cert_path().map_err(|e| e.to_string())?.to_string_lossy()
+                &store
+                    .root_cert_path()
+                    .map_err(|e| e.to_string())?
+                    .to_string_lossy()
             )
         ));
     }
@@ -256,7 +259,10 @@ pub async fn start_proxy(
 }
 
 #[tauri::command]
-pub async fn stop_proxy(app: AppHandle, state: State<'_, AppState>) -> Result<DaemonStatus, String> {
+pub async fn stop_proxy(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<DaemonStatus, String> {
     let mut supervisor = state.supervisor.lock().await;
     let status = supervisor.stop().await.map_err(|e| e.to_string())?;
     drop(supervisor);
@@ -288,11 +294,13 @@ mod tests {
 
         // The provider cannot be saved without a key, and the URL must be usable.
         assert!(set_provider_config("https://api.example.com/v1".into(), None).is_err());
-        assert!(set_provider_config("ftp://api.example.com/v1".into(), Some("sk-1".into())).is_err());
+        assert!(
+            set_provider_config("ftp://api.example.com/v1".into(), Some("sk-1".into())).is_err()
+        );
 
         // The key goes in once and never comes back out to the window.
-        let saved =
-            set_provider_config("https://api.example.com/v1".into(), Some(" sk-1 ".into())).unwrap();
+        let saved = set_provider_config("https://api.example.com/v1".into(), Some(" sk-1 ".into()))
+            .unwrap();
         assert!(saved.api_key_set);
         assert_eq!(saved.base_url, "https://api.example.com/v1");
 
@@ -303,8 +311,14 @@ mod tests {
 
         // Mappings: replace-whole-map semantics, validation, and the fallback path.
         let mapped = set_model_mappings(vec![
-            ModelEntry { kiro: "auto".into(), provider: " gpt-4o ".into() },
-            ModelEntry { kiro: "simple-task".into(), provider: "deepseek-chat".into() },
+            ModelEntry {
+                kiro: "auto".into(),
+                provider: " gpt-4o ".into(),
+            },
+            ModelEntry {
+                kiro: "simple-task".into(),
+                provider: "deepseek-chat".into(),
+            },
         ])
         .unwrap();
         assert_eq!(mapped.models.len(), 2);
@@ -322,10 +336,20 @@ mod tests {
         assert_eq!(replaced.models[0].provider, "gpt-4o-mini");
 
         // Validation: blank rows and duplicate ids are rejected before anything is written.
-        assert!(set_model_mappings(vec![ModelEntry { kiro: "auto".into(), provider: "".into() }]).is_err());
+        assert!(set_model_mappings(vec![ModelEntry {
+            kiro: "auto".into(),
+            provider: "".into()
+        }])
+        .is_err());
         assert!(set_model_mappings(vec![
-            ModelEntry { kiro: "auto".into(), provider: "a".into() },
-            ModelEntry { kiro: "auto".into(), provider: "b".into() },
+            ModelEntry {
+                kiro: "auto".into(),
+                provider: "a".into()
+            },
+            ModelEntry {
+                kiro: "auto".into(),
+                provider: "b".into()
+            },
         ])
         .is_err());
 
@@ -335,10 +359,16 @@ mod tests {
 
         // The fallback is a separate field and survives map replacement.
         assert_eq!(
-            set_default_model(Some("gpt-4o-mini".into())).unwrap().default_model.as_deref(),
+            set_default_model(Some("gpt-4o-mini".into()))
+                .unwrap()
+                .default_model
+                .as_deref(),
             Some("gpt-4o-mini")
         );
-        assert_eq!(set_default_model(Some("  ".into())).unwrap().default_model, None);
+        assert_eq!(
+            set_default_model(Some("  ".into())).unwrap().default_model,
+            None
+        );
 
         // The known Kiro slots ride along on every view so the UI never needs its own copy.
         let with_slots = set_model_mappings(vec![ModelEntry {
@@ -346,7 +376,10 @@ mod tests {
             provider: "gpt-4o".into(),
         }])
         .unwrap();
-        assert!(with_slots.slots.iter().any(|s| s.id == "auto" && !s.name.is_empty()));
+        assert!(with_slots
+            .slots
+            .iter()
+            .any(|s| s.id == "auto" && !s.name.is_empty()));
         assert!(with_slots.slots.iter().any(|s| s.id == "simple-task"));
 
         // What the CLI reads back is exactly what the GUI wrote.

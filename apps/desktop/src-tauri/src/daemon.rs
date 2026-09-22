@@ -122,11 +122,7 @@ pub fn elevation_argv(cli: &Path, port: u16, token: &str, log: &Path) -> (String
         );
         return (
             "powershell".into(),
-            vec![
-                "-NoProfile".into(),
-                "-Command".into(),
-                script,
-            ],
+            vec!["-NoProfile".into(), "-Command".into(), script],
         );
     }
 
@@ -137,7 +133,10 @@ pub fn elevation_argv(cli: &Path, port: u16, token: &str, log: &Path) -> (String
     );
 
     if cfg!(target_os = "macos") {
-        let script = format!("do shell script \"{}\" with administrator privileges", as_quote(&shell));
+        let script = format!(
+            "do shell script \"{}\" with administrator privileges",
+            as_quote(&shell)
+        );
         return ("osascript".into(), vec!["-e".into(), script]);
     }
 
@@ -175,7 +174,10 @@ pub fn elevated_ops_argv(cli: &Path, ops_b64: &str, log: &Path) -> (String, Vec<
     );
 
     if cfg!(target_os = "macos") {
-        let script = format!("do shell script \"{}\" with administrator privileges", as_quote(&shell));
+        let script = format!(
+            "do shell script \"{}\" with administrator privileges",
+            as_quote(&shell)
+        );
         return ("osascript".into(), vec!["-e".into(), script]);
     }
 
@@ -185,16 +187,27 @@ pub fn elevated_ops_argv(cli: &Path, ops_b64: &str, log: &Path) -> (String, Vec<
 /// Minimal standard base64 encoder — the inverse of the CLI's own decoder, kept dependency-free
 /// for one call site (the `elevated --ops` payload).
 fn b64_encode(input: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
-        let bytes = [chunk[0], chunk.get(1).copied().unwrap_or(0), chunk.get(2).copied().unwrap_or(0)];
+        let bytes = [
+            chunk[0],
+            chunk.get(1).copied().unwrap_or(0),
+            chunk.get(2).copied().unwrap_or(0),
+        ];
         let n = ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | bytes[2] as u32;
         out.push(TABLE[(n >> 18) as usize & 63] as char);
         out.push(TABLE[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 { TABLE[(n >> 6) as usize & 63] as char } else { '=' });
-        out.push(if chunk.len() > 2 { TABLE[n as usize & 63] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            TABLE[(n >> 6) as usize & 63] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[n as usize & 63] as char
+        } else {
+            '='
+        });
     }
     out
 }
@@ -202,7 +215,11 @@ fn b64_encode(input: &[u8]) -> String {
 /// Run one privileged batch via the CLI's `elevated` entry point, blocking until it finishes
 /// (or the user declines the prompt). Output lands in the shared daemon log, and a failure
 /// returns the log tail so the window can show *why*.
-pub async fn run_elevated_ops(cli: &Path, ops: &[nine_rai_core::privilege::PrivOp], log: &Path) -> Result<()> {
+pub async fn run_elevated_ops(
+    cli: &Path,
+    ops: &[nine_rai_core::privilege::PrivOp],
+    log: &Path,
+) -> Result<()> {
     let encoded = b64_encode(&serde_json::to_vec(ops)?);
     let (program, args) = elevated_ops_argv(cli, &encoded, log);
     log::info!("running privileged batch via {program}");
@@ -215,7 +232,9 @@ pub async fn run_elevated_ops(cli: &Path, ops: &[nine_rai_core::privilege::PrivO
     let status = tokio::process::Command::new(&program)
         .args(&args)
         .stdin(Stdio::null())
-        .stdout(Stdio::from(file.try_clone().map_err(|e| Error::io(log, e))?))
+        .stdout(Stdio::from(
+            file.try_clone().map_err(|e| Error::io(log, e))?,
+        ))
         .stderr(Stdio::from(file))
         .status()
         .await
@@ -373,7 +392,11 @@ fn stamp() -> String {
 pub fn note(log: &Path, lines: &[String]) {
     use std::io::Write as _;
 
-    let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(log) else {
+    let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+    else {
         return;
     };
     let stamp = stamp();
@@ -388,7 +411,13 @@ pub fn note(log: &Path, lines: &[String]) {
 /// which binary ran (with its build time — a CLI older than the GUI is a bug in itself), how it
 /// was elevated, and whether the CA and hosts file were already in the state the daemon is
 /// about to put them in.
-fn start_banner(cli: &Path, program: &str, port: u16, config: &AppConfig, store: &CertStore) -> Vec<String> {
+fn start_banner(
+    cli: &Path,
+    program: &str,
+    port: u16,
+    config: &AppConfig,
+    store: &CertStore,
+) -> Vec<String> {
     let built = std::fs::metadata(cli)
         .and_then(|m| m.modified())
         .map(|t| {
@@ -413,7 +442,9 @@ fn start_banner(cli: &Path, program: &str, port: u16, config: &AppConfig, store:
         .unwrap_or_else(|_| "?".into());
 
     let hosts_state = match std::fs::read_to_string(paths::hosts_file()) {
-        Ok(text) if hosts::is_current(&text, Tool::Kiro.hosts()) => "already redirected".to_string(),
+        Ok(text) if hosts::is_current(&text, Tool::Kiro.hosts()) => {
+            "already redirected".to_string()
+        }
         Ok(_) => "clean".to_string(),
         Err(e) => format!("unreadable ({e})"),
     };
@@ -611,7 +642,10 @@ impl Supervisor {
         paths::write_private(&session_file, &serde_json::to_vec(&session)?)?;
 
         let (program, args) = elevation_argv(&cli, port, &token, &log);
-        log::info!("launching 9rai daemon: {} (control port {port})", cli.display());
+        log::info!(
+            "launching 9rai daemon: {} (control port {port})",
+            cli.display()
+        );
         note(&log, &start_banner(&cli, &program, port, &config, &store));
 
         // The root has to be trusted before the daemon is launched, and by a path that can
@@ -627,7 +661,9 @@ impl Supervisor {
         let child = Command::new(&program)
             .args(&args)
             .stdin(Stdio::null())
-            .stdout(Stdio::from(log_handle.try_clone().map_err(|e| Error::io(&log, e))?))
+            .stdout(Stdio::from(
+                log_handle.try_clone().map_err(|e| Error::io(&log, e))?,
+            ))
             .stderr(Stdio::from(log_handle))
             .spawn()
             .map_err(|e| {
@@ -759,8 +795,10 @@ impl Supervisor {
         log::warn!("the hosts file is still redirected; restoring it");
         note(
             &log,
-            &["the daemon went away without restoring the hosts file; restoring it now"
-                .to_string()],
+            &[
+                "the daemon went away without restoring the hosts file; restoring it now"
+                    .to_string(),
+            ],
         );
 
         let restore = async {
@@ -951,7 +989,8 @@ mod tests {
 
         // The banner has to answer "which binary, elevated how, and what state was the machine
         // in" without anyone re-running the failure.
-        let text = start_banner(Path::new("/tmp/9rai"), "osascript", 54321, &config, &store).join("\n");
+        let text =
+            start_banner(Path::new("/tmp/9rai"), "osascript", 54321, &config, &store).join("\n");
         assert!(text.contains("start attempt"), "{text}");
         assert!(text.contains("/tmp/9rai"), "{text}");
         assert!(text.contains("osascript"), "{text}");
@@ -1004,7 +1043,10 @@ mod tests {
         assert_eq!(args.len(), 2);
         assert_eq!(args[0], "-e");
         let script = &args[1];
-        assert!(script.contains("elevated --ops OXJhaQ=="), "script: {script}");
+        assert!(
+            script.contains("elevated --ops OXJhaQ=="),
+            "script: {script}"
+        );
         assert!(script.ends_with("with administrator privileges"));
         assert!(script.contains("'/Users/a b/Library/Application Support/9rai/logs/daemon.log'"));
         // A one-shot batch runs in the foreground — no `&` backgrounding.
@@ -1103,7 +1145,10 @@ mod tests {
         assert_eq!(status.state, "failed");
         let detail = status.detail.expect("a failure must explain itself");
         assert!(detail.contains("authorization"), "detail was: {detail}");
-        assert!(supervisor.session.is_none(), "the dead pairing must be dropped");
+        assert!(
+            supervisor.session.is_none(),
+            "the dead pairing must be dropped"
+        );
 
         drop(_home);
         let _ = std::fs::remove_dir_all(&dir);
@@ -1118,7 +1163,10 @@ mod tests {
         std::fs::write(&path, body).unwrap();
 
         let tail = log_tail(&path, 5);
-        assert_eq!(tail, vec!["line 45", "line 46", "line 47", "line 48", "line 49"]);
+        assert_eq!(
+            tail,
+            vec!["line 45", "line 46", "line 47", "line 48", "line 49"]
+        );
 
         assert!(log_tail(&dir.join("absent.log"), 5).is_empty());
         let _ = std::fs::remove_dir_all(&dir);

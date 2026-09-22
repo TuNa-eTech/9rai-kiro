@@ -146,7 +146,12 @@ pub fn windows_set_node_ca(cert_path: &str) -> Vec<Argv> {
 
 pub fn windows_unset_node_ca() -> Vec<Argv> {
     vec![Argv::optional([
-        "reg", "delete", "HKCU\\Environment", "/F", "/V", NODE_CA_VAR,
+        "reg",
+        "delete",
+        "HKCU\\Environment",
+        "/F",
+        "/V",
+        NODE_CA_VAR,
     ])]
 }
 
