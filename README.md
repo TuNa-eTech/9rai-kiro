@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue.svg)](#platform-support)
 [![Build & Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#development--testing)
 
-[Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [CLI Reference](#-cli-reference) • [Architecture](#-architecture) • [Security](#-security--privacy)
+[Features](#-features) • [How It Works](#-how-it-works) • [Quick Start](#-quick-start) • [CLI Reference](#-cli-reference) • [Architecture](#-architecture) • [Desktop GUI](#-desktop-gui) • [Security](#-security--privacy)
 
 </div>
 
@@ -234,6 +234,12 @@ cargo run --bin 9rai -- verify --input fixtures/out.bin
 `nine-rai-core` code as `9rai config` and `9rai ca`, and the privileged half is the actual
 `9rai daemon` process — launched through the OS elevation prompt and then driven over its
 loopback control channel (`GET /status`, `POST /stop`).
+
+### Screenshots
+
+| Home | Settings |
+| :---: | :---: |
+| [![9rai Home view: daemon switch, readiness checklist and recent daemon output](screenshots/home.png)](screenshots/home.png) | [![9rai Settings view: provider endpoint and the Kiro-to-provider model mappings](screenshots/settings.png)](screenshots/settings.png) |
 
 ### Running from source
 
