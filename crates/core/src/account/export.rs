@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::{KiroCredential, CredentialKind};
+use super::{CredentialKind, KiroCredential};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExportError {
@@ -128,7 +128,8 @@ mod tests {
     use std::fs;
 
     fn tmpdir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("9rai-account-export-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("9rai-account-export-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -175,7 +176,10 @@ mod tests {
         assert_eq!(back.client_secret, cred.client_secret);
         assert_eq!(back.profile_arn, cred.profile_arn);
         assert_eq!(back.start_url, cred.start_url);
-        assert_eq!(back.client_id_hash, "e909a0580879b06ece1202964fbe9dda95ea4ce3");
+        assert_eq!(
+            back.client_id_hash,
+            "e909a0580879b06ece1202964fbe9dda95ea4ce3"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
@@ -223,10 +227,15 @@ mod tests {
         };
 
         export_to_folder(&cred, &dir).unwrap();
-        assert!(dir.join("aee64dc2c64212757368d860468ea9a44161d7d5.json").is_file());
+        assert!(dir
+            .join("aee64dc2c64212757368d860468ea9a44161d7d5.json")
+            .is_file());
 
         let back = import_from_folder(&dir).unwrap();
-        assert_eq!(back.client_id_hash, "aee64dc2c64212757368d860468ea9a44161d7d5");
+        assert_eq!(
+            back.client_id_hash,
+            "aee64dc2c64212757368d860468ea9a44161d7d5"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }

@@ -222,9 +222,7 @@ pub fn save_all_settings(
     for entry in models {
         let kiro = entry.kiro.trim().to_string();
         let provider = entry.provider.trim().to_string();
-        if !kiro.is_empty()
-            && !provider.is_empty()
-            && next.insert(kiro.clone(), provider).is_some()
+        if !kiro.is_empty() && !provider.is_empty() && next.insert(kiro.clone(), provider).is_some()
         {
             return Err(format!("Duplicate Kiro model id `{kiro}`"));
         }
@@ -650,7 +648,10 @@ pub async fn mark_exhausted(label: String) -> Result<(AccountsView, Option<Strin
         }
         Err(e) => {
             // The mark stands; only the follow-up switch failed.
-            log::error!("marked '{label}' exhausted but switching to '{}' failed: {e}", next.label);
+            log::error!(
+                "marked '{label}' exhausted but switching to '{}' failed: {e}",
+                next.label
+            );
             format!("marked exhausted but auto-switch failed: {e}")
         }
     };
@@ -701,7 +702,10 @@ pub async fn refresh_accounts_usage() -> Result<(AccountsView, Vec<String>), Str
 
     for account in &mut store.accounts {
         match api
-            .check_usage(&account.credential.access_token, &account.credential.profile_arn)
+            .check_usage(
+                &account.credential.access_token,
+                &account.credential.profile_arn,
+            )
             .await
         {
             Ok(Some(usage)) if usage.is_banned => {
@@ -709,7 +713,10 @@ pub async fn refresh_accounts_usage() -> Result<(AccountsView, Vec<String>), Str
                 notes.push(format!("'{}' is suspended by AWS", account.label));
             }
             Ok(Some(usage)) if usage.is_auth_error => {
-                notes.push(format!("'{}' rejected its token — switch to it to refresh", account.label));
+                notes.push(format!(
+                    "'{}' rejected its token — switch to it to refresh",
+                    account.label
+                ));
             }
             Ok(Some(usage)) => {
                 // A 2xx without a CREDIT breakdown parses to all-zero; applying that would
@@ -878,7 +885,10 @@ mod tests {
         let on_disk = AppConfig::load().unwrap();
         assert_eq!(on_disk.provider.base_url, "https://api.deepseek.com/v1");
         assert_eq!(on_disk.provider.api_key, "sk-deepseek-test");
-        assert_eq!(on_disk.mappings.models.get("auto").unwrap(), "deepseek-chat");
+        assert_eq!(
+            on_disk.mappings.models.get("auto").unwrap(),
+            "deepseek-chat"
+        );
         assert_eq!(on_disk.mappings.default.as_deref(), Some("deepseek-chat"));
 
         drop(_home);
@@ -974,8 +984,17 @@ mod tests {
 
         // The projection is the security boundary: the webview must never receive a token.
         let json = serde_json::to_string(&view).unwrap();
-        for secret in ["at-secret", "rt-secret", "refresh_token", "client_secret", "access_token"] {
-            assert!(!json.contains(secret), "accounts view leaked `{secret}`: {json}");
+        for secret in [
+            "at-secret",
+            "rt-secret",
+            "refresh_token",
+            "client_secret",
+            "access_token",
+        ] {
+            assert!(
+                !json.contains(secret),
+                "accounts view leaked `{secret}`: {json}"
+            );
         }
 
         drop(_home);
@@ -1014,8 +1033,7 @@ mod tests {
         let (_home, dir) = ScratchHome::new("acct-import");
 
         let missing = dir.join("nope");
-        let err = block_on(import_account(missing.display().to_string(), None))
-            .unwrap_err();
+        let err = block_on(import_account(missing.display().to_string(), None)).unwrap_err();
         assert!(
             err.contains("folder not found"),
             "expected a missing-folder error, got: {err}"
@@ -1023,8 +1041,7 @@ mod tests {
 
         // A folder that exists but holds no Kiro files is also rejected, still offline.
         std::fs::create_dir_all(&missing).unwrap();
-        let err = block_on(import_account(missing.display().to_string(), None))
-            .unwrap_err();
+        let err = block_on(import_account(missing.display().to_string(), None)).unwrap_err();
         assert!(
             err.contains("kiro-auth-token.json"),
             "expected a missing-token-file error, got: {err}"
@@ -1040,7 +1057,12 @@ mod tests {
     #[test]
     fn export_account_writes_a_folder_this_app_can_import_back() {
         let (_home, dir) = ScratchHome::new("acct-export");
-        seed_store(vec![seed_account("share-me", "share@example.com", 100.0, 0.0)]);
+        seed_store(vec![seed_account(
+            "share-me",
+            "share@example.com",
+            100.0,
+            0.0,
+        )]);
 
         let out = dir.join("shared-out");
         let written = export_account("share-me".into(), out.display().to_string()).unwrap();

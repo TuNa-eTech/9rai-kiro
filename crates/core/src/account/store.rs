@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::{KiroAccount, AccountStatus};
+use super::{AccountStatus, KiroAccount};
 use crate::{paths, Error, Result};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

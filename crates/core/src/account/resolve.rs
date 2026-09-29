@@ -103,7 +103,11 @@ impl KiroApi {
                 "refresh requires clientId and clientSecret".into(),
             ));
         }
-        let region = if region.is_empty() { "us-east-1" } else { region };
+        let region = if region.is_empty() {
+            "us-east-1"
+        } else {
+            region
+        };
 
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -306,7 +310,10 @@ impl KiroApi {
             ..Default::default()
         };
 
-        if let Some(usage) = self.check_usage(&resolved.access_token, &resolved.profile_arn).await? {
+        if let Some(usage) = self
+            .check_usage(&resolved.access_token, &resolved.profile_arn)
+            .await?
+        {
             resolved.email = usage.email;
             resolved.credit_total = usage.total_limit;
             resolved.credit_used = usage.total_used;

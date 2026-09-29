@@ -98,7 +98,8 @@ fn account_score(acc: &KiroAccount) -> f64 {
         .and_then(|used| {
             let now = time::OffsetDateTime::now_utc().unix_timestamp();
             let seconds_since = now - used;
-            (0..3600).contains(&seconds_since)
+            (0..3600)
+                .contains(&seconds_since)
                 .then_some(1.0 - seconds_since as f64 / 3600.0)
         })
         .unwrap_or(0.0);
@@ -116,10 +117,7 @@ fn parse_iso(s: &str) -> Option<i64> {
 /// Switch Kiro IDE onto `account`: refresh its token, then rewrite the live SSO cache.
 ///
 /// Returns the freshly-refreshed credential so the caller can persist it back to the store.
-pub async fn switch_to_account(
-    account: &KiroAccount,
-    api: &KiroApi,
-) -> Result<KiroCredential> {
+pub async fn switch_to_account(account: &KiroAccount, api: &KiroApi) -> Result<KiroCredential> {
     let mut cred = account.credential.clone();
 
     // 1. Refresh — always, so the written access token is fresh. A stale token surfaces as

@@ -216,8 +216,7 @@ fn extract_start_url(client_secret: &str) -> Option<String> {
     let decoded = engine.decode(&owned).ok()?;
     let outer: BTreeMap<String, serde_json::Value> = serde_json::from_slice(&decoded).ok()?;
     let serialized = outer.get("serialized")?.as_str()?;
-    let inner: BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(serialized).ok()?;
+    let inner: BTreeMap<String, serde_json::Value> = serde_json::from_str(serialized).ok()?;
     inner
         .get("initiateLoginUri")?
         .as_str()
@@ -230,7 +229,8 @@ mod tests {
     use std::fs;
 
     fn tmpdir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("9rai-account-import-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("9rai-account-import-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -264,7 +264,10 @@ mod tests {
         assert_eq!(cred.refresh_token, "rt-1");
         assert_eq!(cred.auth_method, "idc");
         assert_eq!(cred.start_url, "https://view.awsapps.com/start");
-        assert_eq!(cred.client_id_hash, "e909a0580879b06ece1202964fbe9dda95ea4ce3");
+        assert_eq!(
+            cred.client_id_hash,
+            "e909a0580879b06ece1202964fbe9dda95ea4ce3"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
@@ -285,7 +288,10 @@ mod tests {
         .unwrap();
 
         let cred = import_from_folder(&dir).unwrap();
-        assert_eq!(cred.client_id_hash, "e909a0580879b06ece1202964fbe9dda95ea4ce3");
+        assert_eq!(
+            cred.client_id_hash,
+            "e909a0580879b06ece1202964fbe9dda95ea4ce3"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
@@ -309,11 +315,7 @@ mod tests {
     #[test]
     fn missing_refresh_token_is_an_error() {
         let dir = tmpdir("no-refresh");
-        fs::write(
-            dir.join("kiro-auth-token.json"),
-            r#"{"accessToken":"at"}"#,
-        )
-        .unwrap();
+        fs::write(dir.join("kiro-auth-token.json"), r#"{"accessToken":"at"}"#).unwrap();
 
         assert!(matches!(
             import_from_folder(&dir),

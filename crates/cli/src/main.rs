@@ -444,7 +444,11 @@ fn run_account(action: AccountAction) -> Result<()> {
             }
         }
 
-        AccountAction::Switch { label, auto, restart } => {
+        AccountAction::Switch {
+            label,
+            auto,
+            restart,
+        } => {
             let label = match (label, auto) {
                 (Some(l), _) => l,
                 (None, true) | (None, false) => {
@@ -525,13 +529,22 @@ fn maybe_restart_kiro(restart: bool) {
     eprintln!("restarting Kiro IDE...");
     #[cfg(target_os = "macos")]
     {
-        let _ = std::process::Command::new("pkill").arg("-f").arg("Kiro").status();
+        let _ = std::process::Command::new("pkill")
+            .arg("-f")
+            .arg("Kiro")
+            .status();
         std::thread::sleep(std::time::Duration::from_secs(1));
-        let _ = std::process::Command::new("open").arg("-a").arg("Kiro").spawn();
+        let _ = std::process::Command::new("open")
+            .arg("-a")
+            .arg("Kiro")
+            .spawn();
     }
     #[cfg(target_os = "linux")]
     {
-        let _ = std::process::Command::new("pkill").arg("-f").arg("kiro").status();
+        let _ = std::process::Command::new("pkill")
+            .arg("-f")
+            .arg("kiro")
+            .status();
         std::thread::sleep(std::time::Duration::from_secs(1));
         let _ = std::process::Command::new("kiro").spawn();
     }

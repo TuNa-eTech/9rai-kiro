@@ -189,13 +189,22 @@ mod tests {
     #[test]
     fn derived_labels_prefer_the_explicit_name_then_the_email_then_a_hash() {
         // An explicit label wins, trimmed — it is the key every lookup uses.
-        assert_eq!(derive_label(Some(" mine ".into()), "a@b.com", "abcdef1234"), "mine");
+        assert_eq!(
+            derive_label(Some(" mine ".into()), "a@b.com", "abcdef1234"),
+            "mine"
+        );
         // A blank label is the same as no label.
-        assert_eq!(derive_label(Some("   ".into()), "alice@b.com", "abcdef1234"), "alice");
+        assert_eq!(
+            derive_label(Some("   ".into()), "alice@b.com", "abcdef1234"),
+            "alice"
+        );
         // Then the email local-part.
         assert_eq!(derive_label(None, "alice@b.com", "abcdef1234"), "alice");
         // A blank email must not produce a blank label; fall through to the hash.
-        assert_eq!(derive_label(None, "   ", "abcdef1234567890"), "kiro-abcdef12");
+        assert_eq!(
+            derive_label(None, "   ", "abcdef1234567890"),
+            "kiro-abcdef12"
+        );
         assert_eq!(derive_label(None, "", "abcdef1234567890"), "kiro-abcdef12");
     }
 
