@@ -1,6 +1,6 @@
 [package]
 name = "nine-rai-desktop"
-version = "0.1.0"
+version = "0.2.0"
 description = "9rai desktop GUI: configure the engine and supervise the privileged daemon"
 authors = ["anhtu"]
 license = "MIT"

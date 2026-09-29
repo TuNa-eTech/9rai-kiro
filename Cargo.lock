@@ -2447,7 +2447,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "nine-rai-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2460,7 +2460,7 @@ dependencies = [
 
 [[package]]
 name = "nine-rai-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aws-smithy-eventstream",
  "base64 0.22.1",
@@ -2495,7 +2495,7 @@ dependencies = [
 
 [[package]]
 name = "nine-rai-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "log",
  "nine-rai-core",
