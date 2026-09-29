@@ -56,6 +56,11 @@ enum Command {
         #[command(subcommand)]
         action: ConfigAction,
     },
+    /// Manage the Kiro account pool: import/export shared accounts, list and remove.
+    Account {
+        #[command(subcommand)]
+        action: AccountAction,
+    },
     /// Run the interception proxy: set up CA + hosts, serve until Ctrl-C, then restore.
     ///
     /// Must run with privileges (root on macOS to bind :443; Administrator on Windows for the
@@ -110,6 +115,52 @@ enum ConfigAction {
 }
 
 #[derive(Subcommand)]
+enum AccountAction {
+    /// List the accounts in the pool (credentials redacted).
+    List,
+    /// Import an account from a shared folder (kiro-auth-token.json + client registration).
+    ImportFile {
+        /// Folder containing `kiro-auth-token.json` and a `<hash>.json` registration.
+        folder: PathBuf,
+        /// Label to store it under (default: derived from the account email).
+        #[arg(long)]
+        label: Option<String>,
+    },
+    /// Export one account back to a shareable folder (the inverse of import-file).
+    ExportFile {
+        /// Account label to export.
+        label: String,
+        /// Directory to write the two-file folder into.
+        #[arg(long)]
+        out_dir: PathBuf,
+    },
+    /// Remove an account from the pool.
+    Remove {
+        /// Account label to remove.
+        label: String,
+    },
+    /// Switch Kiro IDE onto this account: refresh its token, then rewrite the live SSO cache.
+    Switch {
+        /// Account label to switch to. Omit (or pass `--auto`) to pick the best available.
+        label: Option<String>,
+        /// Pick the account with the most available credit instead of naming one.
+        #[arg(long)]
+        auto: bool,
+        /// Restart Kiro IDE after switching so the new credential takes effect.
+        #[arg(long, short = 'R')]
+        restart: bool,
+    },
+    /// Mark an account exhausted and auto-switch to the next best available account.
+    Exhausted {
+        /// Account label to mark exhausted.
+        label: String,
+        /// Restart Kiro IDE after the auto-switch.
+        #[arg(long, short = 'R')]
+        restart: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum CaAction {
     /// Ensure the root CA exists and print its location and fingerprint.
     Init,
@@ -136,6 +187,11 @@ fn main() -> Result<()> {
         // them for a human at a terminal only.
         .with_ansi(std::io::stdout().is_terminal())
         .init();
+
+    // reqwest is built with `rustls-no-provider`, so the ring provider must be installed
+    // before the first TLS connection anywhere in this process (account import/switch,
+    // provider calls, daemon). Same call the desktop shell makes on startup.
+    nine_rai_core::proxy::init_crypto();
 
     match Cli::parse().command {
         Command::Request { input, model } => {
@@ -193,6 +249,8 @@ fn main() -> Result<()> {
         Command::Ca { action } => run_ca(action)?,
 
         Command::Config { action } => run_config(action)?,
+
+        Command::Account { action } => run_account(action)?,
 
         Command::Daemon {
             control_port,
@@ -294,6 +352,194 @@ fn run_config(action: ConfigAction) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn run_account(action: AccountAction) -> Result<()> {
+    use nine_rai_core::account::{
+        derive_label, export_to_folder, import_from_folder, now_iso, select_best_account,
+        switch_to_account, AccountStatus, AccountStore, KiroAccount, KiroApi,
+    };
+
+    let mut store = AccountStore::load()?;
+
+    match action {
+        AccountAction::List => {
+            if store.accounts.is_empty() {
+                println!("(no accounts)");
+                return Ok(());
+            }
+            for acc in &store.accounts {
+                println!(
+                    "{:<16} {:<24} {:>10.1} {:>10.1}  {}",
+                    acc.label,
+                    acc.email,
+                    acc.credit_used,
+                    acc.credit_total,
+                    acc.status.as_str()
+                );
+            }
+        }
+
+        AccountAction::ImportFile { folder, label } => {
+            let cred = import_from_folder(&folder)
+                .map_err(|e| anyhow::Error::new(e).context("importing account"))?;
+
+            // Resolve identity + credit online (refresh → profileArn → usage). This is the same
+            // network path `switch` will later depend on; a folder whose refresh token is dead
+            // fails here rather than entering the pool silently broken.
+            let api = KiroApi::new(None)?;
+            let runtime = tokio::runtime::Runtime::new()?;
+            let resolved = runtime.block_on(api.resolve_account(
+                &cred.refresh_token,
+                &cred.client_id,
+                &cred.client_secret,
+                &cred.region,
+            ))?;
+
+            let label = derive_label(label, &resolved.email, &cred.client_id_hash);
+            let id = format!("{}-{}", cred.client_id_hash, std::process::id());
+
+            let mut account = KiroAccount {
+                id,
+                label: label.clone(),
+                email: resolved.email.clone(),
+                status: Default::default(),
+                credit_total: resolved.credit_total,
+                credit_used: resolved.credit_used,
+                cycle_reset_at: resolved.reset_at.clone(),
+                last_used_at: None,
+                credential: cred,
+            };
+            account.credential.access_token = resolved.access_token;
+            account.credential.refresh_token = resolved.refresh_token;
+            account.credential.expires_at = resolved.expires_at;
+            account.credential.profile_arn = resolved.profile_arn;
+
+            store.upsert(account);
+            store.save()?;
+            println!(
+                "imported account '{label}' ({} credits available)",
+                (resolved.credit_total - resolved.credit_used).max(0.0)
+            );
+        }
+
+        AccountAction::ExportFile { label, out_dir } => {
+            let account = store
+                .get_by_label(&label)
+                .ok_or_else(|| anyhow::anyhow!("no account with label '{label}'"))?;
+            export_to_folder(&account.credential, &out_dir)
+                .map_err(|e| anyhow::Error::new(e).context("exporting account"))?;
+            eprintln!(
+                "warning: the exported folder contains a live refresh token — share it only with someone you trust"
+            );
+            println!("exported '{label}' to {}", out_dir.display());
+        }
+
+        AccountAction::Remove { label } => {
+            if store.remove_by_label(&label) {
+                store.save()?;
+                println!("removed '{label}'");
+            } else {
+                anyhow::bail!("no account with label '{label}'");
+            }
+        }
+
+        AccountAction::Switch { label, auto, restart } => {
+            let label = match (label, auto) {
+                (Some(l), _) => l,
+                (None, true) | (None, false) => {
+                    // No explicit label → pick the best available.
+                    let accounts: Vec<_> = store.accounts.clone();
+                    let idx = select_best_account(&accounts)
+                        .ok_or_else(|| anyhow::anyhow!("no active account with credit left"))?;
+                    accounts[idx].label.clone()
+                }
+            };
+
+            let account = store
+                .get_by_label(&label)
+                .ok_or_else(|| anyhow::anyhow!("no account with label '{label}'"))?
+                .clone();
+
+            let api = KiroApi::new(None)?;
+            let runtime = tokio::runtime::Runtime::new()?;
+            let refreshed = runtime.block_on(switch_to_account(&account, &api))?;
+
+            // Persist the refreshed credential + last-used stamp back to the pool.
+            if let Some(slot) = store.accounts.iter_mut().find(|a| a.label == label) {
+                slot.credential = refreshed;
+                slot.last_used_at = Some(now_iso());
+            }
+            store.save()?;
+            maybe_restart_kiro(restart);
+        }
+
+        AccountAction::Exhausted { label, restart } => {
+            let account = store
+                .get_by_label(&label)
+                .ok_or_else(|| anyhow::anyhow!("no account with label '{label}'"))?;
+            if account.status != AccountStatus::Active {
+                anyhow::bail!("account '{label}' is already {}", account.status.as_str());
+            }
+
+            // Mark exhausted first, then pick the next best (which is no longer this one).
+            if let Some(slot) = store.accounts.iter_mut().find(|a| a.label == label) {
+                slot.status = AccountStatus::Exhausted;
+            }
+
+            let accounts: Vec<_> = store.accounts.clone();
+            match select_best_account(&accounts) {
+                Some(idx) => {
+                    let next = &accounts[idx];
+                    println!("marked '{label}' exhausted — switching to '{}'", next.label);
+                    let next = next.clone();
+                    let api = KiroApi::new(None)?;
+                    let runtime = tokio::runtime::Runtime::new()?;
+                    let refreshed = runtime.block_on(switch_to_account(&next, &api))?;
+                    if let Some(slot) = store.accounts.iter_mut().find(|a| a.label == next.label) {
+                        slot.credential = refreshed;
+                        slot.last_used_at = Some(now_iso());
+                    }
+                    store.save()?;
+                    maybe_restart_kiro(restart);
+                }
+                None => {
+                    println!("marked '{label}' exhausted — no other account has credit left");
+                    store.save()?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Restart Kiro IDE when `-R`/`--restart` is given, otherwise print the manual hint. Mirrors
+/// the reference: `pkill` the running process, wait a beat for the lock to clear, then relaunch.
+fn maybe_restart_kiro(restart: bool) {
+    if !restart {
+        println!("switched — restart Kiro to apply (or pass -R to auto-restart)");
+        return;
+    }
+
+    eprintln!("restarting Kiro IDE...");
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("pkill").arg("-f").arg("Kiro").status();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let _ = std::process::Command::new("open").arg("-a").arg("Kiro").spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("pkill").arg("-f").arg("kiro").status();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let _ = std::process::Command::new("kiro").spawn();
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        println!("auto-restart is not supported on this platform — restart Kiro manually");
+    }
+    eprintln!("Kiro restarted");
 }
 
 fn run_daemon(control_port: Option<u16>, token: Option<String>) -> Result<()> {

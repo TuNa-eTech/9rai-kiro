@@ -32,8 +32,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+base64 = "0.22"
 crc32fast.workspace = true
 dashmap.workspace = true
+sha2 = "0.10"
 dirs.workspace = true
 futures-util.workspace = true
 sha1.workspace = true

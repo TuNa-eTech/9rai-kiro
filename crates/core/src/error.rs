@@ -29,6 +29,9 @@ pub enum Error {
     #[error("upstream provider: {0}")]
     Provider(String),
 
+    #[error("kiro account: {0}")]
+    Account(String),
+
     #[error("translate: {0}")]
     Translate(String),
 

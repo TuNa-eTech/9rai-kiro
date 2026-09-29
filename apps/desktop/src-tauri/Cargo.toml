@@ -35,6 +35,9 @@ time.workspace = true
 
 tauri = { version = "2.6.3", features = [] }
 tauri-plugin-log = "2"
+# Native folder picker for account import/export — the alternative is asking the user to paste
+# a path, which is exactly the kind of terminal-flavored friction this window exists to remove.
+tauri-plugin-dialog = "2"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

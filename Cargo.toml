@@ -40,7 +40,7 @@ bytes = "1"
 # rustls-platform-verifier — provider connections are therefore verified against the OS trust
 # store (deliberate: corporate CAs on internal endpoints keep working). The bundled webpki
 # roots are used explicitly for the passthrough path in `proxy::passthrough`, not by reqwest.
-reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "http2", "rustls-no-provider"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "http2", "rustls-no-provider", "socks", "query"] }
 hickory-resolver = { version = "0.26", default-features = false, features = ["tokio"] }
 
 serde = { version = "1", features = ["derive"] }

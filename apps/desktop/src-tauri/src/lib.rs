@@ -37,18 +37,32 @@ pub fn run() {
                 .level_for("tracing", log::LevelFilter::Warn)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::set_provider_config,
             commands::set_model_mappings,
             commands::set_default_model,
+            commands::save_all_settings,
+            commands::test_provider_connection,
             commands::ca_status,
             commands::install_ca,
             commands::daemon_status,
             commands::start_proxy,
             commands::stop_proxy,
             commands::daemon_log,
+            commands::check_hosts_stranded,
+            commands::restore_hosts,
+            commands::get_accounts,
+            commands::import_account,
+            commands::import_current_kiro_account,
+            commands::export_account,
+            commands::switch_account,
+            commands::mark_exhausted,
+            commands::remove_account,
+            commands::auto_switch_account,
+            commands::refresh_accounts_usage,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

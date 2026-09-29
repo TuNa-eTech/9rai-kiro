@@ -207,7 +207,7 @@ cargo run --bin 9rai -- verify --input fixtures/out.bin
 ```
 9rai-kiro/
 ├── apps/
-│   └── desktop/          # Tauri control panel: config, CA, daemon lifecycle + logs
+│   └── desktop/          # Tauri control panel: config, CA, daemon lifecycle, logs, account pool
 ├── crates/
 │   ├── cli/              # '9rai' headless binary (clap, tracing)
 │   └── core/             # 'nine-rai-core' engine
@@ -237,9 +237,9 @@ loopback control channel (`GET /status`, `POST /stop`).
 
 ### Screenshots
 
-| Home | Settings |
-| :---: | :---: |
-| [![9rai Home view: daemon switch, readiness checklist and recent daemon output](screenshots/home.png)](screenshots/home.png) | [![9rai Settings view: provider endpoint and the Kiro-to-provider model mappings](screenshots/settings.png)](screenshots/settings.png) |
+| Dashboard | Settings | Accounts |
+| :---: | :---: | :---: |
+| [![9rai Dashboard view: quick setup guide, proxy toggle, active account widget and system health](screenshots/home.png)](screenshots/home.png) | [![9rai Settings view: provider presets, endpoint, API key and visual model routing](screenshots/settings.png)](screenshots/settings.png) | [![9rai Accounts view: pool status, 1-click import, auto-switch and quota monitoring](screenshots/accounts.png)](screenshots/accounts.png) |
 
 ### Running from source
 
@@ -259,9 +259,9 @@ Set `NINE_RAI_CLI=/path/to/9rai` to point the GUI at a specific binary.
 
 ### What it drives
 
-Two views: **Home** — a single on/off switch over the daemon, a readiness checklist (with
-one-click CA auto setup), and the recent daemon output — and **Settings** — provider, mappings,
-root CA, and the full log.
+Three views: **Home** — a single on/off switch over the daemon, a readiness checklist (with
+one-click CA auto setup), and the recent daemon output — **Settings** — provider, mappings,
+root CA, and the full log — and **Accounts** — the Kiro account pool.
 
 | Panel | Backing code |
 | :--- | :--- |
@@ -269,6 +269,13 @@ root CA, and the full log.
 | Model mappings + fallback | `ModelMap`, preset with the Kiro model ids the IDE actually sends (`auto`, `simple-task`, `claude-*`, `gpt-5.6-*`, `deepseek-3.2`, `minimax-m2.1`) |
 | Root CA — fingerprint, trust, one-click auto setup | `CertStore` + `cert::trust::is_installed` + `9rai elevated --ops` |
 | Start / Stop / state / PID / log | `9rai daemon` over the control channel |
+| Account pool — import, switch, mark exhausted, export, remove | `nine_rai_core::account` (`accounts.json`; refresh tokens and client secrets stay in that `0600` file and are never sent to the window) |
+
+The Accounts view is the same switcher the CLI exposes as `9rai account`, minus the terminal:
+import a shared folder, see which account Kiro is live on (a `►` marks the one named by
+`~/.aws/sso/cache/kiro-auth-token.json`), then switch, auto-switch, refresh usage, export or
+remove. A switch rewrites Kiro's live SSO cache, so **restart Kiro afterwards** — the window
+never kills your IDE on its own.
 
 The mapping table is built from `nine_rai_core::config::KIRO_MODEL_SLOTS`, ported from 9router's
 verified MITM dumps: the agent mode sends `auto` for the main turn and `simple-task` for

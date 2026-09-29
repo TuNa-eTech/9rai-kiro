@@ -4,6 +4,7 @@
 //! root CA) -> classify request -> either translate to an OpenAI-compatible provider and
 //! re-encode the reply as an AWS EventStream, or pass through untouched to the real upstream.
 
+pub mod account;
 pub mod appconfig;
 pub mod cert;
 pub mod config;

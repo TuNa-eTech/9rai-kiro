@@ -14,8 +14,10 @@
         <span class="tagline">Kiro IDE → any OpenAI-compatible provider</span>
       </div>
       <nav class="tabs">
-        <button class="tab active" data-view="home">Home</button>
-        <button class="tab" data-view="settings">Settings</button>
+        <button class="tab active" data-view="dashboard" title="Tổng quan hệ thống">⚡ Tổng quan</button>
+        <button class="tab" data-view="settings" title="Cấu hình nhà cung cấp AI &amp; ánh xạ model">⚙️ Cài đặt</button>
+        <button class="tab" data-view="accounts" title="Kho tài khoản Kiro IDE">👥 Tài khoản</button>
+        <button class="tab" data-view="diagnostics" title="Kiểm tra Root CA, mạng &amp; nhật ký log">🛡️ Chẩn đoán</button>
       </nav>
       <div id="proxy-pill" class="pill" data-state="stopped">stopped</div>
     </header>
@@ -23,107 +25,806 @@
     <div id="banner" class="banner hidden" role="alert"></div>
 
     <main>
-      <!-- ── Home: quick on/off + readiness ─────────────────────────── -->
-      <section class="card" id="view-home">
-        <div class="hero-head">
-          <div>
-            <h2 id="hero-state" data-state="stopped">Proxy is off</h2>
-            <p class="hint" id="daemon-detail"></p>
+      <!-- Stranded hosts file warning banner (Global Alert) -->
+      <div id="stranded-banner" class="alert-card warning hidden">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+          <h4>Phát hiện cấu hình mạng chưa dọn dẹp</h4>
+          <p>
+            File hosts của hệ thống vẫn còn trỏ tên miền Kiro về máy cục bộ (do lần tắt đột ngột trước đó). Kiro IDE có thể không truy cập được mạng.
+          </p>
+        </div>
+        <button id="btn-restore-hosts" class="btn danger" type="button">Khôi phục mạng</button>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <!-- 1. DASHBOARD                                                   -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <div id="view-dashboard">
+        <!-- Quick Onboarding / Getting Started Guide (Visible when setup incomplete) -->
+        <section class="card onboarding-card" id="onboarding-guide">
+          <div class="card-head">
+            <div class="badge-title">
+              <span class="icon-rocket">🚀</span>
+              <h2>Hướng dẫn bắt đầu nhanh (Quick Setup)</h2>
+            </div>
+            <p class="sub">Hoàn thành 2 bước sau để kích hoạt 9rai với Kiro IDE:</p>
           </div>
-          <label class="switch" title="Start or stop the 9rai proxy">
-            <input type="checkbox" id="proxy-toggle" aria-label="Start or stop the 9rai proxy" />
-            <span class="slider"></span>
-          </label>
+          <div class="steps-list">
+            <div class="step-item" id="step-provider">
+              <div class="step-num">1</div>
+              <div class="step-info">
+                <strong>Cấu hình Nhà cung cấp AI (Provider)</strong>
+                <p id="step-provider-desc">Chọn preset (DeepSeek, OpenRouter, OpenAI, v.v.) và nhập API key.</p>
+              </div>
+              <button class="step-btn ghost" id="btn-goto-provider" type="button">Cài đặt →</button>
+            </div>
+            <div class="step-item" id="step-ca">
+              <div class="step-num">2</div>
+              <div class="step-info">
+                <strong>Cài đặt chứng chỉ bảo mật (Root CA)</strong>
+                <p id="step-ca-desc">Cần thiết để Kiro IDE tin cậy kết nối mã hóa HTTPS cục bộ.</p>
+              </div>
+              <button class="step-btn ghost" id="btn-quick-ca" type="button">Cài đặt 1-Click →</button>
+            </div>
+            <div class="step-item" id="step-proxy">
+              <div class="step-num">3</div>
+              <div class="step-info">
+                <strong>Bật Proxy</strong>
+                <p id="step-proxy-desc">Gạt công tắc bên dưới để bắt đầu can thiệp và chuyển hướng AI.</p>
+              </div>
+              <span class="step-status" id="step-proxy-status">Chờ thiết lập</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dual Command Cards: AI Proxy Engine + Kiro Active Account -->
+        <div class="dash-grid">
+          <!-- Card 1: AI Proxy Engine -->
+          <section class="card dash-card">
+            <div class="card-head-row">
+              <span class="card-tag">AI Proxy Engine</span>
+              <span id="dash-proxy-badge" class="badge" data-state="stopped">stopped</span>
+            </div>
+
+            <div class="dash-hero">
+              <div class="dash-hero-info">
+                <h3 id="hero-state" data-state="stopped">Proxy is off</h3>
+                <p class="dash-sub" id="daemon-detail">Chặn và định tuyến yêu cầu từ Kiro IDE</p>
+              </div>
+              <label class="switch" title="Bật hoặc tắt 9rai proxy">
+                <input type="checkbox" id="proxy-toggle" aria-label="Bật hoặc tắt 9rai proxy" />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="dash-meta-box">
+              <div class="kv"><span>Nhà cung cấp:</span><strong id="dash-provider-name">Chưa cấu hình</strong></div>
+              <div class="kv"><span>Mô hình chính:</span><code id="dash-primary-model">—</code></div>
+              <div class="kv"><span>Mô hình dự phòng:</span><code id="dash-fallback-model">—</code></div>
+            </div>
+
+            <div class="dash-actions">
+              <button id="dash-goto-router" class="ghost" type="button">Cấu hình Cài đặt AI →</button>
+            </div>
+          </section>
+
+          <!-- Card 2: Kiro Active Account -->
+          <section class="card dash-card">
+            <div class="card-head-row">
+              <span class="card-tag">Tài khoản Kiro IDE</span>
+              <span id="dash-account-status" class="badge" data-state="unknown">no account</span>
+            </div>
+
+            <div class="dash-account-hero">
+              <div class="active-avatar" id="dash-account-avatar">👤</div>
+              <div class="active-info">
+                <h3 id="dash-account-label" class="account-name">Chưa có tài khoản</h3>
+                <p id="dash-account-email" class="account-email">Đăng nhập Kiro để sử dụng</p>
+              </div>
+            </div>
+
+            <div class="dash-credits-box">
+              <div class="credits-header">
+                <span>Khả dụng (Còn lại):</span>
+                <strong id="dash-credits-text">— / —</strong>
+              </div>
+              <div class="progress-bar-wrap" id="dash-credits-bar-wrap">
+                <div class="progress-bar" id="dash-credits-bar" style="width: 0%"></div>
+              </div>
+              <div class="credits-footer">
+                <span id="dash-credits-left">chưa có dữ liệu</span>
+                <span id="dash-resets-text">Đặt lại: —</span>
+              </div>
+            </div>
+
+            <div class="dash-actions">
+              <button id="dash-auto-switch" class="ghost" type="button" disabled>Tự động chuyển tài khoản</button>
+              <button id="dash-goto-accounts" class="ghost" type="button">Kho tài khoản →</button>
+            </div>
+          </section>
         </div>
 
-        <div class="kv"><span>Daemon PID</span><code id="daemon-pid">—</code></div>
-        <div class="kv"><span>Control port</span><code id="daemon-port">—</code></div>
+        <!-- System Health Bar -->
+        <section class="card health-bar">
+          <div class="health-item">
+            <span class="health-dot" id="health-ca-dot"></span>
+            <span class="health-label">Root CA:</span>
+            <strong id="health-ca-text">Đang kiểm tra…</strong>
+          </div>
+          <div class="health-sep">•</div>
+          <div class="health-item">
+            <span class="health-dot" id="health-hosts-dot"></span>
+            <span class="health-label">File Hosts:</span>
+            <strong id="health-hosts-text">Sạch sẽ</strong>
+          </div>
+          <div class="health-sep">•</div>
+          <div class="health-item">
+            <span class="health-dot ok"></span>
+            <span class="health-label">Loopback Port:</span>
+            <strong>127.0.0.1:443</strong>
+          </div>
+          <button id="health-fix-btn" class="ghost small-btn hidden" type="button">Sửa ngay →</button>
+        </section>
+      </div>
 
-        <h3 class="check-title">Readiness</h3>
-        <ul class="checklist" id="checklist"></ul>
-
-        <details class="log-wrap" open>
-          <summary>Recent daemon output</summary>
-          <pre id="home-log">—</pre>
-        </details>
-      </section>
-
-      <!-- ── Settings: the engine's configuration ───────────────────── -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <!-- 2. SETTINGS / CÀI ĐẶT                                          -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
       <div id="view-settings" class="hidden">
-        <section class="card">
+        <!-- Quick Section Subnav -->
+        <nav class="settings-subnav">
+          <a href="#sec-provider" class="subnav-pill">⚡ 1. Nhà cung cấp AI</a>
+          <a href="#sec-pipeline" class="subnav-pill">🔄 2. Sơ đồ Định tuyến</a>
+          <a href="#sec-slots" class="subnav-pill">🎯 3. Slot Cốt lõi (80/20)</a>
+          <a href="#sec-models" class="subnav-pill">📋 4. Bảng Model Kiro</a>
+          <a href="#sec-system" class="subnav-pill">🛡️ 5. Hệ thống &amp; Bảo mật</a>
+        </nav>
+
+        <!-- 1. AI Provider & Endpoint -->
+        <section class="card" id="sec-provider">
           <div class="card-head">
-            <h2>Provider</h2>
+            <div class="card-tag">PHẦN 1</div>
+            <h2>Nhà cung cấp AI &amp; Điểm cuối (AI Provider &amp; Endpoint)</h2>
             <p class="sub">
-              Where intercepted Kiro chat turns are sent. The key is stored with <code>0600</code>
-              and is never sent back to this window.
+              Nơi nhận và xử lý các yêu cầu trò chuyện từ Kiro IDE. Dữ liệu và API key được mã hóa và lưu trữ cục bộ tại máy tính (chế độ bảo mật 0600).
             </p>
           </div>
-          <div class="field">
-            <label for="base-url">Base URL</label>
-            <input id="base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" />
+
+          <!-- Presets Grid -->
+          <div class="presets-section">
+            <div class="section-label">
+              <span>Mẫu thiết lập nhanh (Presets):</span>
+              <span class="hint-mini">Nhấn để áp dụng cấu hình khuyến nghị</span>
+            </div>
+            <div class="presets-grid">
+              <button type="button" class="preset-card" data-preset="9router">
+                <div class="preset-card-head">
+                  <span class="preset-icon">⚡</span>
+                  <strong>9Router</strong>
+                  <span class="preset-badge badge-rec">Khuyến nghị</span>
+                </div>
+                <p class="preset-desc">Proxy nội bộ đa mô hình: Claude 3.7 Sonnet, DeepSeek V3/R1, MiniMax qua loopback.</p>
+                <code class="preset-url">127.0.0.1:20128/v1</code>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="deepseek">
+                <div class="preset-card-head">
+                  <span class="preset-icon">🤖</span>
+                  <strong>DeepSeek</strong>
+                  <span class="preset-badge badge-eco">Tiết kiệm</span>
+                </div>
+                <p class="preset-desc">API chính thức từ DeepSeek: DeepSeek-V3 cho hội thoại và DeepSeek-R1 cho suy luận.</p>
+                <code class="preset-url">api.deepseek.com/v1</code>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="openrouter">
+                <div class="preset-card-head">
+                  <span class="preset-icon">🌐</span>
+                  <strong>OpenRouter</strong>
+                  <span class="preset-badge badge-var">Đa dạng</span>
+                </div>
+                <p class="preset-desc">Cổng kết nối AI toàn diện: Claude 3.5 Sonnet, GPT-4o, DeepSeek với 1 API key duy nhất.</p>
+                <code class="preset-url">openrouter.ai/api/v1</code>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="openai">
+                <div class="preset-card-head">
+                  <span class="preset-icon">🧠</span>
+                  <strong>OpenAI</strong>
+                  <span class="preset-badge badge-std">Chuẩn mực</span>
+                </div>
+                <p class="preset-desc">API chính thức của OpenAI: GPT-4o, GPT-4o-mini, o1 và các mô hình mới nhất.</p>
+                <code class="preset-url">api.openai.com/v1</code>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="ollama">
+                <div class="preset-card-head">
+                  <span class="preset-icon">💻</span>
+                  <strong>Ollama (Local)</strong>
+                  <span class="preset-badge badge-loc">Offline 100%</span>
+                </div>
+                <p class="preset-desc">Chạy mô hình mã nguồn mở (Qwen2.5-Coder, DeepSeek) trực tiếp trên máy của bạn.</p>
+                <code class="preset-url">localhost:11434/v1</code>
+              </button>
+            </div>
           </div>
-          <div class="field">
-            <label for="api-key">API key</label>
-            <input id="api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…" />
-            <p class="hint" id="api-key-hint">No key stored yet.</p>
+
+          <!-- Endpoint Form -->
+          <div class="provider-form-grid">
+            <div class="field">
+              <label for="base-url">
+                <span>Base URL (API Endpoint)</span>
+                <span class="field-sub">Điểm cuối tương thích chuẩn OpenAI</span>
+              </label>
+              <input id="base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1" />
+            </div>
+
+            <div class="field">
+              <label for="api-key">
+                <span>API Key</span>
+                <span class="field-sub">Khóa xác thực dịch vụ (Được bảo mật 0600)</span>
+              </label>
+              <div class="input-with-action">
+                <input id="api-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…" />
+                <button type="button" id="toggle-key-visibility" class="icon-btn" title="Hiện/ẩn API key">👁️</button>
+              </div>
+              <p class="hint" id="api-key-hint">Chưa có API key nào được lưu.</p>
+            </div>
           </div>
-          <div class="actions">
-            <button id="save-provider" class="btn primary">Save provider</button>
+
+          <!-- Test Connection Action -->
+          <div class="test-conn-bar">
+            <button id="btn-test-connection" class="btn secondary" type="button">
+              <span>⚡ Kiểm tra kết nối (Test Connection)</span>
+            </button>
+            <span class="test-conn-tip">Gửi yêu cầu thử nghiệm tới Endpoint để xác minh tính hợp lệ và lấy danh sách model</span>
+          </div>
+
+          <!-- Test Result Box -->
+          <div id="connection-test-result" class="test-result-box hidden"></div>
+        </section>
+
+        <!-- 2. Visual Routing Pipeline -->
+        <section class="card" id="sec-pipeline">
+          <div class="card-head">
+            <div class="card-tag">PHẦN 2</div>
+            <h2>Cơ chế &amp; Sơ đồ Định tuyến Khoa học (Visual Routing Pipeline)</h2>
+            <p class="sub">
+              Cách thức 9rai phân loại và chuyển tiếp các yêu cầu trò chuyện từ Kiro IDE đến nhà cung cấp AI:
+            </p>
+          </div>
+
+          <div class="routing-pipeline-diagram">
+            <div class="pipe-node pipe-start">
+              <div class="pipe-step-num">BƯỚC 1</div>
+              <div class="pipe-icon">💻</div>
+              <strong>Kiro IDE Gửi Lượt Chat</strong>
+              <span>Yêu cầu mang mã Model ID</span>
+            </div>
+
+            <div class="pipe-arrow">➔</div>
+
+            <div class="pipe-node pipe-check">
+              <div class="pipe-step-num">BƯỚC 2</div>
+              <div class="pipe-icon">🎯</div>
+              <strong>Khớp Ánh Xạ Đích Danh</strong>
+              <span>Kiểm tra bảng Model Mappings</span>
+            </div>
+
+            <div class="pipe-branches">
+              <div class="pipe-branch branch-yes">
+                <span class="branch-label">Khớp model (Có)</span>
+                <div class="pipe-dest dest-mapped">
+                  <strong>🚀 Gửi Model Đích sang Provider</strong>
+                  <span id="diag-mapped-sample">Định tuyến sang mô hình tương ứng</span>
+                </div>
+              </div>
+
+              <div class="pipe-branch branch-no">
+                <span class="branch-label">Không khớp (Chưa đặt)</span>
+                <div class="pipe-dest dest-fallback">
+                  <strong>🛡️ Model Dự phòng (Fallback)</strong>
+                  <span id="diag-fallback-sample">Nếu trống ➔ Passthrough sang AWS gốc</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Pipeline Summary Box -->
+          <div class="pipeline-summary-box">
+            <div class="sum-item">
+              <span class="sum-label">Agent chính (auto):</span>
+              <code id="sum-slot-auto" class="sum-val">—</code>
+            </div>
+            <div class="sum-sep">|</div>
+            <div class="sum-item">
+              <span class="sum-label">Tác vụ ngầm (simple-task):</span>
+              <code id="sum-slot-simple" class="sum-val">—</code>
+            </div>
+            <div class="sum-sep">|</div>
+            <div class="sum-item">
+              <span class="sum-label">Dự phòng (fallback):</span>
+              <code id="sum-fallback" class="sum-val">—</code>
+            </div>
+            <div class="sum-sep">|</div>
+            <div class="sum-item">
+              <span class="sum-label">Tổng ánh xạ:</span>
+              <strong id="sum-mapped-count" class="sum-count">0 model</strong>
+            </div>
           </div>
         </section>
 
-        <section class="card">
+        <!-- 3. Core Agent Slots (80/20) -->
+        <section class="card" id="sec-slots">
           <div class="card-head">
-            <h2>Model mappings</h2>
+            <div class="card-tag">PHẦN 3</div>
+            <h2>Thiết lập Mô hình Cốt lõi (Core Agent Slots - 80/20 Rule)</h2>
             <p class="sub">
-              Kiro model id → provider model. <code>auto</code> is the agent's main turn and
-              <code>simple-task</code> its background sub-tasks — leave a slot empty to pass it
-              through to AWS untouched.
+              Hầu hết công việc của Kiro IDE tập trung vào 2 chế độ này. Định nghĩa mô hình nhà cung cấp sẽ thay thế:
             </p>
           </div>
-          <div class="slot-rows" id="slot-rows"></div>
-          <div class="row add-row">
-            <input id="custom-kiro" placeholder="custom Kiro model id…" spellcheck="false" />
-            <span class="arrow">→</span>
-            <input id="custom-provider" placeholder="provider model" spellcheck="false" />
-          </div>
-          <div class="actions">
-            <button id="apply-mappings" class="btn primary">Apply mappings</button>
-          </div>
-          <div class="row default-row">
-            <label for="default-model">Fallback for unmapped models</label>
-            <input id="default-model" placeholder="(none — pass through)" spellcheck="false" />
-            <button id="save-default" class="btn">Save</button>
-            <button id="clear-default" class="btn ghost">Clear</button>
+
+          <div class="core-slots-grid">
+            <!-- Slot Auto -->
+            <div class="slot-card">
+              <div class="slot-card-header">
+                <div class="slot-badge-title">
+                  <span class="slot-icon">🎯</span>
+                  <div>
+                    <strong>Agent / Trò chuyện chính <code>(auto)</code></strong>
+                    <p class="slot-card-desc">Xử lý toàn bộ prompt chat, hội thoại code và hành động của Kiro Agent</p>
+                  </div>
+                </div>
+                <span class="slot-priority-badge badge-essential">Cốt lõi 1</span>
+              </div>
+              <input type="text" id="slot-auto" data-slot="auto" spellcheck="false" placeholder="ví dụ: deepseek-chat, gpt-4o, claude-3-5-sonnet" />
+              <div class="quick-chips-box">
+                <span class="chips-label">Gợi ý nhanh:</span>
+                <div class="chips-list" data-target="slot-auto">
+                  <button type="button" class="chip-btn" data-val="deepseek-chat">deepseek-chat</button>
+                  <button type="button" class="chip-btn" data-val="deepseek-reasoner">deepseek-reasoner</button>
+                  <button type="button" class="chip-btn" data-val="gpt-4o">gpt-4o</button>
+                  <button type="button" class="chip-btn" data-val="anthropic/claude-3.5-sonnet">claude-3.5-sonnet</button>
+                  <button type="button" class="chip-btn" data-val="deepseek-v4-pro">deepseek-v4-pro</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot Simple-Task -->
+            <div class="slot-card">
+              <div class="slot-card-header">
+                <div class="slot-badge-title">
+                  <span class="slot-icon">⚡</span>
+                  <div>
+                    <strong>Tác vụ nền &amp; Sinh mã ngắn <code>(simple-task)</code></strong>
+                    <p class="slot-card-desc">Xử lý code completion tức thời, linting, và các sub-tasks chạy ngầm</p>
+                  </div>
+                </div>
+                <span class="slot-priority-badge badge-essential">Cốt lõi 2</span>
+              </div>
+              <input type="text" id="slot-simple" data-slot="simple-task" spellcheck="false" placeholder="ví dụ: deepseek-chat, gpt-4o-mini" />
+              <div class="quick-chips-box">
+                <span class="chips-label">Gợi ý nhanh:</span>
+                <div class="chips-list" data-target="slot-simple">
+                  <button type="button" class="chip-btn" data-val="deepseek-chat">deepseek-chat</button>
+                  <button type="button" class="chip-btn" data-val="gpt-4o-mini">gpt-4o-mini</button>
+                  <button type="button" class="chip-btn" data-val="anthropic/claude-3.5-haiku">claude-3.5-haiku</button>
+                  <button type="button" class="chip-btn" data-val="qwen2.5-coder:latest">qwen2.5-coder</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Slot Fallback -->
+            <div class="slot-card slot-card-fallback">
+              <div class="slot-card-header">
+                <div class="slot-badge-title">
+                  <span class="slot-icon">🛡️</span>
+                  <div>
+                    <strong>Mô hình Dự phòng Toàn cục <code>(fallback)</code></strong>
+                    <p class="slot-card-desc">Áp dụng cho bất kỳ model Kiro nào chưa được cấu hình. Để trống để chuyển tiếp AWS gốc</p>
+                  </div>
+                </div>
+                <span class="slot-priority-badge badge-fallback">Dự phòng</span>
+              </div>
+              <input type="text" id="default-model" spellcheck="false" placeholder="(để trống: chuyển tiếp an toàn sang AWS gốc)" />
+              <div class="quick-chips-box">
+                <span class="chips-label">Gợi ý nhanh:</span>
+                <div class="chips-list" data-target="default-model">
+                  <button type="button" class="chip-btn" data-val="deepseek-chat">deepseek-chat</button>
+                  <button type="button" class="chip-btn" data-val="gpt-4o">gpt-4o</button>
+                  <button type="button" class="chip-btn" data-val="anthropic/claude-3.5-sonnet">claude-3.5-sonnet</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section class="card">
+        <!-- 4. Specific Categorized Models -->
+        <section class="card" id="sec-models">
           <div class="card-head">
-            <h2>Root certificate</h2>
+            <div class="card-tag">PHẦN 4</div>
+            <h2>Danh mục Ánh xạ Model Kiro theo Nhóm (Model Families)</h2>
             <p class="sub">
-              One click mints the CA and installs it into the system trust store (one
-              administrator prompt). Starting the proxy does the same automatically.
+              Khi bạn chủ động chọn một model cụ thể từ danh sách picker của Kiro IDE, yêu cầu sẽ được chuyển tiếp theo bảng cấu hình dưới đây:
             </p>
           </div>
-          <div class="kv"><span>Fingerprint</span><code id="ca-fingerprint">—</code></div>
-          <div class="kv"><span>Trusted</span><span id="ca-trusted" class="badge" data-state="unknown">—</span></div>
-          <div class="actions">
-            <button id="ca-setup" class="btn primary">Auto setup</button>
+
+          <!-- Filter & Search Toolbar -->
+          <div class="model-toolbar">
+            <div class="model-search-box">
+              <input type="search" id="model-filter-input" placeholder="🔍 Tìm kiếm model Kiro (tên, mã mãu...)" spellcheck="false" />
+            </div>
+            <div class="model-filter-pills">
+              <button type="button" class="filter-pill active" data-family="all">Tất cả (<span id="count-all">0</span>)</button>
+              <button type="button" class="filter-pill" data-family="claude">Anthropic Claude (<span id="count-claude">0</span>)</button>
+              <button type="button" class="filter-pill" data-family="deepseek">DeepSeek &amp; Khác (<span id="count-deepseek">0</span>)</button>
+              <button type="button" class="filter-pill" data-family="gpt">OpenAI GPT (<span id="count-gpt">0</span>)</button>
+              <button type="button" class="filter-pill" data-family="custom">Tùy chỉnh (<span id="count-custom">0</span>)</button>
+            </div>
+          </div>
+
+          <!-- Model Families Container -->
+          <div id="model-families-container">
+            <!-- Family 1: Claude -->
+            <div class="family-group" data-family="claude" id="group-claude">
+              <div class="family-header">
+                <span class="family-icon">🟣</span>
+                <span class="family-title">Dòng Anthropic Claude (Kiro IDE Picker)</span>
+                <span class="family-count" id="badge-count-claude">7 models</span>
+              </div>
+              <div class="family-rows" id="rows-claude"></div>
+            </div>
+
+            <!-- Family 2: DeepSeek & MiniMax -->
+            <div class="family-group" data-family="deepseek" id="group-deepseek">
+              <div class="family-header">
+                <span class="family-icon">🟢</span>
+                <span class="family-title">Dòng DeepSeek &amp; MiniMax</span>
+                <span class="family-count" id="badge-count-deepseek">2 models</span>
+              </div>
+              <div class="family-rows" id="rows-deepseek"></div>
+            </div>
+
+            <!-- Family 3: OpenAI GPT Series -->
+            <div class="family-group" data-family="gpt" id="group-gpt">
+              <div class="family-header">
+                <span class="family-icon">🔵</span>
+                <span class="family-title">Dòng OpenAI GPT Series (Kiro IDE Picker)</span>
+                <span class="family-count" id="badge-count-gpt">3 models</span>
+              </div>
+              <div class="family-rows" id="rows-gpt"></div>
+            </div>
+
+            <!-- Family 4: Custom User Mappings -->
+            <div class="family-group" data-family="custom" id="group-custom">
+              <div class="family-header">
+                <span class="family-icon">🟠</span>
+                <span class="family-title">Mô hình Tùy chỉnh do Người dùng Định nghĩa (Custom Mappings)</span>
+                <span class="family-count" id="badge-count-custom">0 model</span>
+              </div>
+              <div class="custom-mappings-list" id="custom-mappings-list"></div>
+
+              <!-- Add Custom Mapping Row -->
+              <div class="add-custom-box">
+                <div class="add-custom-inputs">
+                  <input id="custom-kiro" placeholder="Mã Kiro model (vd: claude-3-7-sonnet)…" spellcheck="false" />
+                  <span class="arrow">➔</span>
+                  <input id="custom-provider" placeholder="Model nhà cung cấp đích (vd: gpt-4o)…" spellcheck="false" />
+                </div>
+                <button type="button" id="btn-add-custom-model" class="btn secondary">+ Thêm ánh xạ</button>
+              </div>
+            </div>
           </div>
         </section>
 
+        <!-- 5. System & Security Settings -->
+        <section class="card" id="sec-system">
+          <div class="card-head">
+            <div class="card-tag">PHẦN 5</div>
+            <h2>Thiết lập Hệ thống &amp; Bảo mật (System &amp; Environment)</h2>
+            <p class="sub">
+              Thông số chứng chỉ bảo mật Root CA, mạng nội bộ và tệp lưu trữ cấu hình 9rai:
+            </p>
+          </div>
+
+          <div class="system-settings-grid">
+            <!-- CA Setting Box -->
+            <div class="sys-card">
+              <div class="sys-card-head">
+                <span class="sys-icon">🛡️</span>
+                <strong>Chứng chỉ bảo mật Root CA</strong>
+              </div>
+              <div class="kv"><span>Trạng thái:</span><span id="set-ca-trusted" class="badge" data-state="unknown">—</span></div>
+              <div class="kv"><span>Mã vân tay:</span><code id="set-ca-fingerprint">—</code></div>
+              <div class="sys-actions">
+                <button id="set-ca-setup" class="btn secondary" type="button">Tự động cài đặt CA 1-Click</button>
+              </div>
+            </div>
+
+            <!-- Network Setting Box -->
+            <div class="sys-card">
+              <div class="sys-card-head">
+                <span class="sys-icon">🌐</span>
+                <strong>Mạng &amp; Tên miền Kiro</strong>
+              </div>
+              <div class="kv"><span>Cổng Loopback:</span><code>127.0.0.1:443</code></div>
+              <div class="kv"><span>File Hosts:</span><strong id="set-hosts-status">Bình thường</strong></div>
+              <div class="sys-actions">
+                <button id="set-restore-hosts" class="btn ghost danger-text" type="button">Khôi phục file hosts</button>
+              </div>
+            </div>
+
+            <!-- Storage Setting Box -->
+            <div class="sys-card">
+              <div class="sys-card-head">
+                <span class="sys-icon">📄</span>
+                <strong>Tệp lưu trữ Cấu hình</strong>
+              </div>
+              <div class="kv"><span>Đường dẫn:</span><code id="set-config-path">—</code></div>
+              <div class="kv"><span>Quyền riêng tư:</span><code>0600 (Owner Only)</code></div>
+              <p class="sys-note">API key được lưu trữ an toàn và không bao giờ đồng bộ lên dịch vụ đám mây bên ngoài.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Sticky Unified Save Action Bar -->
+        <div class="settings-action-bar">
+          <div class="save-status-info">
+            <span class="dirty-dot" id="dirty-dot">●</span>
+            <span id="dirty-text">Tất cả cấu hình đã đồng bộ</span>
+          </div>
+          <div class="save-bar-buttons">
+            <button id="btn-reset-settings" class="btn ghost" type="button">🔄 Hoàn tác (Reset)</button>
+            <button id="save-all-settings" class="primary big-btn" type="button">
+              <span>💾 Lưu tất cả cài đặt (Save All Settings)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <!-- 3. ACCOUNTS / KHO TÀI KHOẢN KIRO                               -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <div id="view-accounts" class="hidden">
+        <!-- 1. KPI Statistics Bar -->
+        <div class="accounts-kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon">👥</div>
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng tài khoản</span>
+              <strong id="acct-stat-total" class="kpi-val">0</strong>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">⚡</div>
+            <div class="kpi-info">
+              <span class="kpi-label">Đang dùng (Live)</span>
+              <strong id="acct-stat-active" class="kpi-val">—</strong>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">💎</div>
+            <div class="kpi-info">
+              <span class="kpi-label">Hạn mức khả dụng</span>
+              <strong id="acct-stat-credits" class="kpi-val">—</strong>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">🛡️</div>
+            <div class="kpi-info">
+              <span class="kpi-label">Tình trạng Pool</span>
+              <strong id="acct-stat-health" class="kpi-val">Chưa có dữ liệu</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Active Account Spotlight Card -->
+        <section class="card acct-spotlight-card hidden" id="accounts-active-spotlight">
+          <div class="spotlight-badge-bar">
+            <span class="spotlight-live-tag">
+              <span class="pulse-dot"></span> ĐANG HOẠT ĐỘNG TRONG KIRO IDE
+            </span>
+            <span class="spotlight-tip">💡 Khởi động lại Kiro IDE sau khi chuyển tài khoản</span>
+          </div>
+
+          <div class="spotlight-content">
+            <div class="spotlight-avatar">👤</div>
+            <div class="spotlight-details">
+              <div class="spotlight-title-row">
+                <h3 id="spotlight-name">—</h3>
+                <span id="spotlight-meta" class="spotlight-meta-tag">—</span>
+              </div>
+              <p id="spotlight-email" class="spotlight-email-text">—</p>
+
+              <!-- Progress bar in spotlight -->
+              <div class="spotlight-progress-wrap">
+                <div class="spotlight-progress-header">
+                  <span>Khả dụng (Còn lại):</span>
+                  <strong id="spotlight-credits-val">—</strong>
+                </div>
+                <div class="spotlight-progress-bar-bg" id="spotlight-progress-bar-bg">
+                  <div class="spotlight-progress-bar" id="spotlight-progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="spotlight-progress-footer">
+                  <span id="spotlight-credits-percent">0% còn lại</span>
+                  <span id="spotlight-reset-time">Đặt lại: —</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Actions & Import Control Center -->
+        <section class="card acct-actions-card">
+          <div class="acct-primary-actions">
+            <button id="accounts-import-current" class="primary big-btn" type="button">
+              <span>📥 Nhập tài khoản Kiro đang dùng (1-Click)</span>
+            </button>
+            <button id="accounts-auto" class="btn secondary" type="button">
+              <span>⚡ Tự động chuyển (Auto-switch)</span>
+            </button>
+            <button id="accounts-refresh" class="btn ghost" type="button">
+              <span>🔄 Làm mới hạn mức (Refresh)</span>
+            </button>
+          </div>
+
+          <!-- Advanced Folder Import (Collapsible) -->
+          <details class="import-folder-details">
+            <summary>
+              <span class="summary-title">📁 Nhập tài khoản từ Thư mục chia sẻ (Import Folder)</span>
+              <span class="summary-sub">Dành cho token và client secret được chia sẻ từ máy tính khác</span>
+            </summary>
+            <div class="import-folder-body">
+              <div class="import-row">
+                <button id="import-pick" class="btn ghost" type="button">Chọn thư mục…</button>
+                <span id="import-path" class="path-display" title="">chưa chọn thư mục</span>
+                <input id="import-label" placeholder="Tên gợi nhớ (tùy chọn)" spellcheck="false" />
+                <button id="import-go" class="primary" disabled type="button">Import</button>
+              </div>
+              <p class="hint">
+                Thư mục chia sẻ cần chứa tệp <code>kiro-auth-token.json</code> và tệp đăng ký client <code>&lt;hash&gt;.json</code>.
+              </p>
+            </div>
+          </details>
+        </section>
+
+        <!-- 4. Accounts Pool Table / Explorer -->
+        <section class="card acct-table-card">
+          <div class="acct-table-header">
+            <div>
+              <h2>Danh sách Tài khoản Kiro (Accounts Pool)</h2>
+              <p class="sub">Danh sách các tài khoản đã nhập. Nhấn "Kích hoạt" để chuyển Kiro IDE sang tài khoản mong muốn:</p>
+            </div>
+          </div>
+
+          <!-- Search & Filter Toolbar -->
+          <div class="acct-toolbar-row">
+            <div class="acct-search-box">
+              <input type="search" id="acct-search-input" placeholder="🔍 Tìm kiếm theo tên tài khoản, email..." spellcheck="false" />
+            </div>
+            <div class="acct-filter-pills">
+              <button type="button" class="filter-pill active" data-acct-filter="all">Tất cả (<span id="acct-count-all">0</span>)</button>
+              <button type="button" class="filter-pill" data-acct-filter="ready">Sẵn sàng (<span id="acct-count-ready">0</span>)</button>
+              <button type="button" class="filter-pill" data-acct-filter="exhausted">Hết ngạch (<span id="acct-count-exhausted">0</span>)</button>
+            </div>
+            <div class="acct-sort-box">
+              <select id="acct-sort-select">
+                <option value="default">Sắp xếp: Mặc định</option>
+                <option value="credits-desc">Credits còn lại nhiều nhất</option>
+                <option value="reset-asc">Gần ngày reset nhất</option>
+                <option value="name-asc">Tên (A-Z)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Accounts Table -->
+          <div class="table-scroll">
+            <table id="accounts-table">
+              <thead>
+                <tr>
+                  <th style="width: 25%">Tài khoản</th>
+                  <th style="width: 20%">Email</th>
+                  <th style="width: 14%">Trạng thái</th>
+                  <th style="width: 22%">Hạn mức Credits</th>
+                  <th style="width: 9%">Đặt lại</th>
+                  <th style="width: 10%; text-align: right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-body"></tbody>
+            </table>
+          </div>
+
+          <!-- Empty State -->
+          <div id="accounts-empty" class="accounts-empty-card hidden">
+            <div class="empty-icon">👤</div>
+            <h3>Chưa có tài khoản Kiro nào trong kho</h3>
+            <p>
+              Nhấn <strong>"Nhập tài khoản Kiro đang dùng"</strong> để tự động đọc phiên đăng nhập Kiro IDE trên máy của bạn, hoặc chọn thư mục chia sẻ.
+            </p>
+            <button id="btn-empty-import" class="primary big-btn" type="button">
+              📥 Nhập tài khoản Kiro ngay
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <!-- 4. DIAGNOSTICS & SYSTEM                                        -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <div id="view-diagnostics" class="hidden">
+        <!-- Root Certificate -->
         <section class="card">
           <div class="card-head">
-            <h2>Daemon log</h2>
-            <p class="sub">The daemon's own output, captured by the launcher.</p>
+            <h2>Chứng chỉ bảo mật (Root Certificate Authority)</h2>
+            <p class="sub">
+              Chứng chỉ Root CA cục bộ (ECDSA P-256) được tạo riêng trên máy tính của bạn để Kiro IDE tin cậy kết nối HTTPS mã hóa mà không cần can thiệp tệp nhị phân.
+            </p>
+          </div>
+          <div class="kv"><span>Mã vân tay (Fingerprint)</span><code id="ca-fingerprint">—</code></div>
+          <div class="kv"><span>Trạng thái hệ thống</span><span id="ca-trusted" class="badge" data-state="unknown">—</span></div>
+          <div class="actions">
+            <button id="ca-setup" class="primary" type="button">Tự động cài đặt (Auto setup CA)</button>
+          </div>
+        </section>
+
+        <!-- Network & Hosts -->
+        <section class="card">
+          <div class="card-head">
+            <h2>Cấu hình Mạng &amp; Tên miền (DNS &amp; Hosts)</h2>
+            <p class="sub">
+              9rai tự động chuyển hướng các tên miền Kiro sang loopback <code>127.0.0.1</code> khi Proxy hoạt động, và khôi phục sạch sẽ khi dừng.
+            </p>
+          </div>
+          <div class="kv"><span>Trạng thái file hosts</span><strong id="diag-hosts-status">Bình thường (Sạch sẽ)</strong></div>
+          <div class="kv"><span>DNS Phía trên (Upstream DNS)</span><code>8.8.8.8 (Google DNS - Vượt loopback)</code></div>
+          <div class="actions">
+            <button id="diag-restore-hosts" class="danger" type="button">Khôi phục file hosts thủ công</button>
+          </div>
+        </section>
+
+        <!-- Daemon Runtime & Full Log -->
+        <section class="card">
+          <div class="card-head-row">
+            <div>
+              <h2>Nhật ký hoạt động (Daemon Runtime &amp; Logs)</h2>
+              <p class="sub">Toàn bộ output của tiến trình proxy daemon.</p>
+            </div>
+            <div class="diag-meta">
+              <span>PID: <code id="daemon-pid">—</code></span>
+              <span>Port: <code id="daemon-port">—</code></span>
+            </div>
+          </div>
+          <div class="log-actions-bar">
+            <button id="btn-copy-log" class="ghost" type="button">📋 Sao chép Log</button>
+            <button id="btn-refresh-log" class="ghost" type="button">🔄 Làm mới</button>
           </div>
           <pre id="daemon-log">—</pre>
         </section>
       </div>
     </main>
 
-    <footer><code id="config-path"></code></footer>
+    <!-- Pre-elevation confirmation dialog modal -->
+    <div id="elevation-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>🔐 Cấp quyền Quản trị viên</h3>
+        <p id="elevation-desc">
+          9rai cần quyền Administrator để lắng nghe cổng mạng <strong>:443</strong> và tạm thời trỏ tên miền của Kiro về máy tính cục bộ.
+        </p>
+        <p class="modal-note">
+          Thao tác này hoàn toàn <strong>an toàn và chỉ chạy trên máy của bạn</strong>. Nhấn <strong>Tiếp tục</strong> để xác nhận với hộp thoại hệ thống.
+        </p>
+        <div class="modal-actions">
+          <button id="elevation-cancel" class="ghost" type="button">Hủy bỏ</button>
+          <button id="elevation-confirm" class="primary" type="button">Tiếp tục</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span class="footer-brand">⚡ 9rai · 100% Local &amp; Private</span>
+      <code id="config-path"></code>
+    </footer>
     <div id="toasts"></div>
     <script type="module" src="main.js"></script>
   </body>
